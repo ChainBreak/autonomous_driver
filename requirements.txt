@@ -1,0 +1,5 @@
+pytest
+pygame
+torch
+opencv-python
+numpy
