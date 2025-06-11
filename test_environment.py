@@ -12,13 +12,21 @@ def main():
     env = Environment("map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg")
     
     # Add some cars with different positions and velocities
-    car1 = Car(x=100, y=100, angle=0, velocity=50)
-    car2 = Car(x=200, y=200, angle=np.pi/4, velocity=30)
-    car3 = Car(x=300, y=300, angle=np.pi/2, velocity=40)
+    cars = [
+
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/2, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/3, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/4, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/5, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/6, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/7, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/8, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/9, speed=40),
+        Car(x=np.random.randint(0, env.map_width), y=np.random.randint(0, env.map_height), angle=np.pi/10, speed=40),
+    ]
     
-    env.add_car(car1)
-    env.add_car(car2)
-    env.add_car(car3)
+    for car in cars:
+        env.add_car(car)
     
     # Initialize the display
     screen = pygame.display.set_mode((800, 600))
@@ -41,16 +49,16 @@ def main():
         env.render()
         
         # Get views for all cars
-        car_views = env.get_car_views()
+        observations = env.get_observations()
 
         # Convert numpy arrays to pygame surfaces and display them
         view_width = config.view_width  # Width of each view
         view_height = config.view_height  # Height of each view
         padding = 10  # Padding between views
         
-        for i, view in enumerate(car_views):
+        for i, observation in enumerate(observations):
             # Convert numpy array to pygame surface
-            view_surface = pygame.surfarray.make_surface(view)
+            view_surface = pygame.surfarray.make_surface(observation.view)
             
             # Calculate position in grid (2x2 layout)
             row = i // 2
