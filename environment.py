@@ -3,9 +3,10 @@ import numpy as np
 import config
 import cv2
 import dataclasses
+from pathlib import Path
 
 class Environment:
-    def __init__(self, map_path: str):
+    def __init__(self, map_path: Path):
         pygame.init()
           
         # Load the map image first to get its dimensions
@@ -36,8 +37,10 @@ class Environment:
         
         return self.surface
 
-    def get_observations(self) -> list[np.ndarray]:
-        
+    def get_observations(self) -> list["Observation"]:
+
+        self.render()
+
         # Convert to numpy array
         surface_np = pygame.surfarray.array3d(surface=self.surface) # (w,h,c)
         surface_np = np.transpose(surface_np, (1, 0, 2)) # (h,w,c)
@@ -48,11 +51,12 @@ class Environment:
         return observations
 
 class Car:
-    def __init__(self, x: float, y: float, angle: float = 0.0, speed: float = 0.0):
+    def __init__(self,env: "Environment", x: float, y: float, angle: float = 0.0, speed: float = 0.0):
         self.x = x
         self.y = y
         self.angle = angle  # in radians
         self.speed = speed
+        self.env = env
         self.width = config.car_width  # car width in pixels
         self.length = config.car_height  # car length in pixels
         self.view_width = config.view_width
@@ -63,6 +67,9 @@ class Car:
         # Update position based on speed and angle
         self.x += self.speed * np.cos(self.angle) * dt
         self.y += self.speed * np.sin(self.angle) * dt
+
+        self.x = np.clip(self.x, 0, self.env.map_width)
+        self.y = np.clip(self.y, 0, self.env.map_height)
 
     def draw(self, surface: pygame.Surface):
         # Create a rectangle for the car
@@ -76,7 +83,7 @@ class Car:
         # Draw the car on the surface
         surface.blit(rotated_car, new_rect.topleft)
 
-    def get_observation(self, surface: np.ndarray) -> np.ndarray:
+    def get_observation(self, surface_image: np.ndarray) -> "Observation":
 
         M = cv2.getRotationMatrix2D(
             center=(self.x,self.y),
@@ -85,7 +92,7 @@ class Car:
         )
         M[0,2] += self.view_width/2 - self.x
         M[1,2] += self.view_height/2 - self.y
-        view = cv2.warpAffine(surface,M,(self.view_width,self.view_height))
+        view = cv2.warpAffine(surface_image,M,(self.view_width,self.view_height))
 
         observation = Observation(
             view=view,

@@ -3,3 +3,4 @@ pygame
 torch
 opencv-python
 numpy
+click

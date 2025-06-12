@@ -1,34 +1,30 @@
-def main():
-    print("Hello, World!")
+import click
+from game import Game
+from pathlib import Path
+
+@click.group()
+def cli():
+    """Autonomous Driver CLI"""
+    pass
+
+@cli.command()
+@click.option('--model-path', type=Path, help='Path to the trained model')
+def run(model_path: Path):
+    """Run the autonomous driver with a trained model"""
+    game = Game()
+    game.run()
 
 
-    import pygame
-    pygame.init()
-    screen = pygame.display.set_mode((800, 600))
-    sprite = pygame.image.load("red_car.png").convert_alpha()  # Load sprite with transparency
-    # Resize sprite to 32x32
-    sprite = pygame.transform.scale(sprite, (32, 32))
-    
-    # Set position and rotation
-    x, y = 200, 150  # Specific x,y coordinates
-    angle = 45
-    
-    # Rotate sprite
-    rotated_sprite = pygame.transform.rotate(sprite, angle)
-    # Get the rect and set its center to our desired position
-    sprite_rect = rotated_sprite.get_rect(center=(x, y))
-    
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-        
-        screen.fill((255, 255, 255))  # White background
-        screen.blit(rotated_sprite, sprite_rect)  # Draw rotated sprite at x,y
-        pygame.display.flip()
-        
-    pygame.quit()
+@cli.command()
+@click.option('--epochs', type=int, default=100, help='Number of training epochs')
+@click.option('--batch-size', type=int, default=32, help='Training batch size')
+@click.option('--learning-rate', type=float, default=0.001, help='Learning rate')
+def train(epochs, batch_size, learning_rate):
+    """Train the autonomous driver model"""
+    click.echo(f"Training model for {epochs} epochs")
+    click.echo(f"Batch size: {batch_size}")
+    click.echo(f"Learning rate: {learning_rate}")
+    # TODO: Implement the actual training logic
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    cli()
