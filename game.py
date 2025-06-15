@@ -27,7 +27,7 @@ class Game:
                 env=self.env,
                 x=np.random.randint(0, self.env.map_width), 
                 y=np.random.randint(0, self.env.map_height), 
-                angle=np.random.uniform(0, 2*np.pi), 
+                angle_deg=np.random.uniform(0, 360), 
                 speed=np.random.uniform(10, 40), 
             )
             self.env.add_car(car)
@@ -65,7 +65,7 @@ class Game:
 
     def update(self, actions: list[Action]):
         dt = 1/config.fps   
-        print(dt)
+
         # Update and render
         self.env.update(actions=actions, dt=dt)
 
