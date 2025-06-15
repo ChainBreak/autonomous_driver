@@ -21,10 +21,10 @@ class Environment:
     def add_car(self, car: "Car"):
         self.cars.append(car)
 
-    def update(self, dt: float):
+    def update(self, actions: list["Action"], dt: float):
         # Update all cars
-        for car in self.cars:
-            car.update(dt)
+        for car, action in zip(self.cars, actions):
+            car.update(action=action, dt=dt)
 
     def render(self) -> pygame.Surface:
         
@@ -63,8 +63,17 @@ class Car:
         self.view_height = config.view_height
 
 
-    def update(self, dt: float):
+    def update(self, action: "Action", dt: float):
         # Update position based on speed and angle
+        if action.forward:
+            self.speed += 10 * dt
+        elif action.backward:
+            self.speed -= 10 * dt
+        if action.left:
+            self.angle += 1 * dt
+        if action.right:
+            self.angle -= 1 * dt
+
         self.x += self.speed * np.cos(self.angle) * dt
         self.y += self.speed * np.sin(self.angle) * dt
 
@@ -105,5 +114,7 @@ class Observation:
 
 @dataclasses.dataclass
 class Action:
-    steering: float
-    acceleration: float
+    left: bool 
+    right: bool
+    forward: bool
+    backward: bool

@@ -12,6 +12,7 @@ def cli():
 def run(model_path: Path):
     """Run the autonomous driver with a trained model"""
     game = Game()
+    game.setup()
     game.run()
 
 

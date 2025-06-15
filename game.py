@@ -1,4 +1,4 @@
-from environment import Environment, Car, Observation
+from environment import Environment, Car, Observation, Action
 import numpy as np
 import pygame
 import config
@@ -7,10 +7,12 @@ class Game:
     screen: pygame.Surface
     clock: pygame.time.Clock
     env: Environment
+    keys_pressed: dict[int, bool] 
     running: bool = False
 
     def __init__(self):
-        self.setup()
+        # self.setup()
+        pass
 
     def setup(self):
         # Initialize pygame
@@ -41,12 +43,15 @@ class Game:
 
         while self.running:
 
-            self.handle_events()
             observations = self.get_observations()
-            self.update()
             self.draw_screen(observations)
-            # self.get_actions()
-            # self.set_actions()
+            self.handle_events()
+            human_action = self.get_human_actions()
+            actions = self.get_model_actions(observations)
+            actions[0] = human_action
+
+            self.update(actions=actions)
+
         # Clean up pygame
         pygame.quit()
 
@@ -56,16 +61,19 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
 
-    def update(self):
-        # Calculate delta time
-        dt = self.clock.tick(config.fps) / 1000.0
+        self.keys_pressed = pygame.key.get_pressed()
 
+    def update(self, actions: list[Action]):
+        dt = 1/config.fps   
+        print(dt)
         # Update and render
-        self.env.update(dt)
+        self.env.update(actions=actions, dt=dt)
 
     def get_observations(self) -> list[Observation]:
         # Get views for all cars
         observations = self.env.get_observations()
+
+        self.clock.tick(config.fps)
 
         return observations
 
@@ -94,6 +102,33 @@ class Game:
 
         # Update the display
         pygame.display.flip()
+
+    def get_human_actions(self) -> Action:
+        """Get actions from human player (keyboard input)"""
+
+        action = Action(
+            left=self.keys_pressed[pygame.K_LEFT],
+            right=self.keys_pressed[pygame.K_RIGHT],
+            forward=self.keys_pressed[pygame.K_UP],
+            backward=self.keys_pressed[pygame.K_DOWN],
+        )
+            
+        return action
+
+    def get_model_actions(self, observations: list[Observation]) -> list[Action]:
+        """Get actions from AI model for each car"""
+        # For now, return random actions for each car
+        # TODO: Replace with actual model predictions
+        actions: list[Action] = []
+        for _ in observations:
+            action = Action(
+                left=bool(np.random.randint(2)),
+                right=bool(np.random.randint(2)), 
+                forward=bool(np.random.randint(2)),
+                backward=bool(np.random.randint(2)),
+            )
+            actions.append(action)
+        return actions
 
         
 
