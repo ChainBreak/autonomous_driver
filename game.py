@@ -97,7 +97,8 @@ class Game:
         # Draw the view of each car
         for i, observation in enumerate(observations):
             # Convert numpy array to pygame surface
-            view_surface = pygame.surfarray.make_surface(observation.view)
+            view = np.transpose(observation.view, (1, 0, 2)) #h,w,c to w,h,c
+            view_surface = pygame.surfarray.make_surface(view)
             
             # Calculate position in grid (2x2 layout)
             row = i // 2

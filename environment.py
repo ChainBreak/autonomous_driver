@@ -75,7 +75,7 @@ class Car:
 
         # Steering ratio connect distance to degrees turned.
         # This is a simple model of the car's steering.
-        steering_ratio_target = config.car_max_steering_ratio * action.left - config.car_max_steering_ratio * action.right
+        steering_ratio_target = config.car_max_steering_ratio * action.right - config.car_max_steering_ratio * action.left
         steering_ratio_speed = config.car_steering_ratio_speed * dt
         self.steering_ratio += np.clip(steering_ratio_target - self.steering_ratio, -steering_ratio_speed, steering_ratio_speed)
 
@@ -106,7 +106,7 @@ class Car:
 
         M = cv2.getRotationMatrix2D(
             center=(self.x,self.y),
-            angle=self.angle_deg+180,
+            angle=self.angle_deg+90,
             scale=1.0,
         )
         M[0,2] += self.view_width/2 - self.x
