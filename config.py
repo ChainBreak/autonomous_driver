@@ -19,3 +19,5 @@ car_deceleration = 10
 car_max_steering_ratio = 5 #deg/distance
 car_steering_ratio_speed = 20 #deg/distance/second
 map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg"
+
+recording_dir = project_root / "recorded_data"

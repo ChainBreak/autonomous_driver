@@ -2,6 +2,7 @@ from environment import Environment, Car, Observation, Action
 import numpy as np
 import pygame
 import config
+from recorder import Recorder
 
 class Game:
     screen: pygame.Surface
@@ -20,6 +21,7 @@ class Game:
         
         # Create environment with a blank map
         self.env = Environment(config.map_path)
+        self.recorder = Recorder(config.recording_dir)
         
         # Generate all the cars
         for _ in range(config.num_cars):
@@ -42,24 +44,30 @@ class Game:
         self.running = True
 
         while self.running:
-
-            observations = self.get_observations()
-            self.draw_screen(observations)
-            self.handle_events()
-            human_action = self.get_human_actions()
-            actions = self.get_model_actions(observations)
-            actions[0] = human_action
-
-            self.update(actions=actions)
+            self.loop()
 
         # Clean up pygame
         pygame.quit()
+
+    def loop(self):
+        observations = self.get_observations()
+        self.draw_screen(observations)
+        self.handle_events()
+        human_action = self.get_human_actions()
+        actions = self.get_model_actions(observations)
+        actions[0] = human_action
+        self.update(actions=actions)
+        self.recorder.record(observations[0], actions[0])
 
     def handle_events(self):
         # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    self.recorder.toggle_recording()
 
         self.keys_pressed = pygame.key.get_pressed()
 
@@ -78,12 +86,15 @@ class Game:
         return observations
 
     def draw_screen(self, observations: list[Observation]):
+        
+        self.screen.fill((0, 0, 0))
 
         # Convert numpy arrays to pygame surfaces and display them
         view_width = config.view_width  # Width of each view
         view_height = config.view_height  # Height of each view
         padding = 10  # Padding between views
-        
+
+        # Draw the view of each car
         for i, observation in enumerate(observations):
             # Convert numpy array to pygame surface
             view_surface = pygame.surfarray.make_surface(observation.view)
@@ -99,6 +110,15 @@ class Game:
             
             # Draw the view
             self.screen.blit(view_surface, (x, y))
+
+        # Draw red border when recording
+        if self.recorder.recording:
+            pygame.draw.rect(
+                self.screen,
+                (255, 0, 0),  # Red color
+                (0, 0, self.screen.get_width(), self.screen.get_height()),
+                2  # Border thickness
+            )
 
         # Update the display
         pygame.display.flip()
