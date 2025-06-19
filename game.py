@@ -57,7 +57,7 @@ class Game:
         actions = self.get_model_actions(observations)
         actions[0] = human_action
         self.update(actions=actions)
-        self.recorder.record(observations[0], actions[0])
+        self.recorder.record(observations[0], human_action)
 
     def handle_events(self):
         # Handle events
@@ -71,19 +71,20 @@ class Game:
 
         self.keys_pressed = pygame.key.get_pressed()
 
+
     def update(self, actions: list[Action]):
         dt = 1/config.fps   
 
         # Update and render
         self.env.update(actions=actions, dt=dt)
 
+
     def get_observations(self) -> list[Observation]:
         # Get views for all cars
         observations = self.env.get_observations()
 
-        self.clock.tick(config.fps)
-
         return observations
+
 
     def draw_screen(self, observations: list[Observation]):
         
@@ -95,7 +96,7 @@ class Game:
         padding = 10  # Padding between views
 
         # Draw the view of each car
-        for i, observation in enumerate(observations):
+        for i, observation in enumerate(observations[:4]):
             # Convert numpy array to pygame surface
             view = np.transpose(observation.view, (1, 0, 2)) #h,w,c to w,h,c
             view_surface = pygame.surfarray.make_surface(view)
@@ -124,6 +125,9 @@ class Game:
         # Update the display
         pygame.display.flip()
 
+        self.clock.tick(config.fps)
+    
+
     def get_human_actions(self) -> Action:
         """Get actions from human player (keyboard input)"""
 
@@ -135,6 +139,7 @@ class Game:
         )
             
         return action
+
 
     def get_model_actions(self, observations: list[Observation]) -> list[Action]:
         """Get actions from AI model for each car"""
