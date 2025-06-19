@@ -65,9 +65,12 @@ class Car:
 
 
     def update(self, action: "Action", dt: float):
+
+        left, right, forward, backward = action
+
         # Update the speed
-        target_speed = config.car_max_speed * action.forward - config.car_max_speed * action.backward
-        if action.forward or action.backward:
+        target_speed = config.car_max_speed * forward - config.car_max_speed * backward
+        if forward or backward:
             acceleration = config.car_acceleration * dt
         else:
             acceleration = config.car_deceleration * dt
@@ -75,7 +78,7 @@ class Car:
 
         # Steering ratio connect distance to degrees turned.
         # This is a simple model of the car's steering.
-        steering_ratio_target = config.car_max_steering_ratio * action.right - config.car_max_steering_ratio * action.left
+        steering_ratio_target = config.car_max_steering_ratio * right - config.car_max_steering_ratio * left
         steering_ratio_speed = config.car_steering_ratio_speed * dt
         self.steering_ratio += np.clip(steering_ratio_target - self.steering_ratio, -steering_ratio_speed, steering_ratio_speed)
 
@@ -122,9 +125,4 @@ class Car:
 class Observation:
     view: np.ndarray
 
-@dataclasses.dataclass
-class Action:
-    left: bool 
-    right: bool
-    forward: bool
-    backward: bool
+Action = np.ndarray

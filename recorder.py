@@ -2,7 +2,7 @@ from environment import Observation, Action
 from pathlib import Path
 from datetime import datetime
 import cv2
-import json
+import numpy as np
 
 class Recorder:
     recording:bool = False
@@ -36,13 +36,12 @@ class Recorder:
             return
 
         image_path = self.recording_dir / f"frame_{self.frame_count:06d}.png"
-        json_path = self.recording_dir / f"frame_{self.frame_count:06d}.json"
+        action_path = self.recording_dir / f"frame_{self.frame_count:06d}.npy"
  
         view = cv2.cvtColor(observation.view, cv2.COLOR_BGR2RGB)
         cv2.imwrite(str(image_path), view)
 
-        with open(json_path, "w") as f:
-            json.dump(action.__dict__, f)
+        np.save(action_path, action)
 
         self.frame_count += 1
 

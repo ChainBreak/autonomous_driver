@@ -131,12 +131,12 @@ class Game:
     def get_human_actions(self) -> Action:
         """Get actions from human player (keyboard input)"""
 
-        action = Action(
-            left=self.keys_pressed[pygame.K_LEFT],
-            right=self.keys_pressed[pygame.K_RIGHT],
-            forward=self.keys_pressed[pygame.K_UP],
-            backward=self.keys_pressed[pygame.K_DOWN],
-        )
+        action = np.array([
+            self.keys_pressed[pygame.K_LEFT],
+            self.keys_pressed[pygame.K_RIGHT],
+            self.keys_pressed[pygame.K_UP],
+            self.keys_pressed[pygame.K_DOWN],
+        ])
             
         return action
 
@@ -147,12 +147,12 @@ class Game:
         # TODO: Replace with actual model predictions
         actions: list[Action] = []
         for _ in observations:
-            action = Action(
-                left=bool(np.random.randint(2)),
-                right=bool(np.random.randint(2)), 
-                forward=bool(np.random.randint(2)),
-                backward=bool(np.random.randint(2)),
-            )
+            action = np.array([
+                bool(np.random.randint(2)),
+                bool(np.random.randint(2)),
+                bool(np.random.randint(2)),
+                bool(np.random.randint(2)),
+            ])
             actions.append(action)
         return actions
 
