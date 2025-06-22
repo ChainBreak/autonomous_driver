@@ -1,5 +1,5 @@
 from collections import deque
-
+import numpy as np
 
 class AverageHistoryWindows:
     def __init__(self, window_sizes:list[int]):
@@ -19,7 +19,11 @@ class AverageHistoryWindows:
 
         return windows
     
-    def get_average(self):
+
+    def get_window_averages_numpy(self):
+        return np.array([window.get_average() for window in self.windows])
+    
+    def get_window_averages(self):
         return [window.get_average() for window in self.windows]
     
     def push(self, value):
