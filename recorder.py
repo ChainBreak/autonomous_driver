@@ -7,15 +7,15 @@ import numpy as np
 class Recorder:
     recording:bool = False
     frame_count:int = 0
-    output_dir:Path = Path("")
+    data_dir:Path = Path("")
     recording_dir:Path = Path("")
 
     def __init__(self, output_dir:Path):
-        self.output_dir = output_dir
+        self.data_dir = output_dir
 
     def start_recording(self):
         datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.recording_dir = self.output_dir / f"recording_{datetime_str}"
+        self.recording_dir = self.data_dir / f"recording_{datetime_str}"
         self.recording_dir.mkdir(parents=True, exist_ok=True)
         self.frame_count = 0
         self.recording = True

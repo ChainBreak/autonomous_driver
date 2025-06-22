@@ -1,4 +1,6 @@
 import click
+from dataset import RecordedDataset
+from history_digest import HistoryDigest
 from game import Game
 from pathlib import Path
 
@@ -17,15 +19,32 @@ def run(model_path: Path):
 
 
 @cli.command()
-@click.option('--epochs', type=int, default=100, help='Number of training epochs')
-@click.option('--batch-size', type=int, default=32, help='Training batch size')
-@click.option('--learning-rate', type=float, default=0.001, help='Learning rate')
-def train(epochs, batch_size, learning_rate):
+@click.option('--data-dir', type=Path, help='Path to the data directory')
+def train(data_dir: Path):
     """Train the autonomous driver model"""
-    click.echo(f"Training model for {epochs} epochs")
-    click.echo(f"Batch size: {batch_size}")
-    click.echo(f"Learning rate: {learning_rate}")
+    click.echo(f"Training model for {data_dir}")
     # TODO: Implement the actual training logic
+    history_digest = HistoryDigest.from_window_growth_rate(num_windows=4, growth_rate=2.0)
+    dataset = RecordedDataset(data_dir=data_dir, history_digest=history_digest)
+
+
+@cli.command()
+def test():
+    target = 0.99
+    for i in range(10):
+        steps = 2**i
+        a = 1 - (1-target)**(1/steps)
+        print(f"{steps} {a:.2f}")
+
+
+    x=1
+    y = 0
+    y_initial = y
+    a = 0.1
+    for i in range(10):
+        y += a * (x- y )
+        y_ = y_initial + (1-(1-a)**(i+1)) * (x-y_initial)
+        print(f"{x:.2f} {y:.2f} {y_:.2f}")
 
 if __name__ == '__main__':
     cli()
