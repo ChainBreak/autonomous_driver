@@ -47,3 +47,16 @@ def test_average_history_windows(window_sizes, values):
         assert np.all(window_average == np.mean(values_reversed[i1:i2],axis=0))
         i1 = i2
     
+@pytest.mark.parametrize("num_windows, growth_rate, expected_window_sizes", [
+    (4, 2.0, [1, 2, 4, 8]),
+    (4, 1.5, [1, 1, 2, 3]),
+    (5, 1.2, [1, 1, 1, 1, 2]),
+])
+def test_average_history_windows_from_window_growth_rate(num_windows, growth_rate, expected_window_sizes):
+    windows = AverageHistoryWindows.from_window_growth_rate(num_windows=num_windows, growth_rate=growth_rate)
+    for window, expected_window_size in zip(windows.windows, expected_window_sizes):
+        assert window.window_size == expected_window_size
+    
+
+if __name__ == "__main__":
+    pytest.main([__file__])

@@ -1,14 +1,22 @@
 from collections import deque
 import numpy as np
-
 class AverageHistoryWindows:
+
+    @classmethod
+    def from_window_growth_rate(cls,num_windows:int, growth_rate:float):
+        window_sizes = []
+        for i in range(num_windows):
+            window_sizes.append(int(growth_rate**i))
+        return cls(window_sizes)
+
     def __init__(self, window_sizes:list[int]):
 
         self.windows = self._build_window_chain(window_sizes)
+        self.total_length = sum(window_sizes)
 
     def _build_window_chain(self,window_sizes:list[int])->list["RollingWindowChain"]:
         windows:list["RollingWindowChain"] = []
-
+    
         for window_size in window_sizes:
             new_window = RollingWindowChain(window_size)
             # Link the new window to the previous window if it exists
@@ -29,6 +37,11 @@ class AverageHistoryWindows:
     def push(self, value):
         # Add the value to the first window. Everything else is handled by the chain
         self.windows[0].push(value)
+
+    def fill(self, value):
+        """Fill all windows with the same value"""
+        for _ in range(self.total_length):
+            self.push(value)
 
 class RollingWindowChain:
     """
