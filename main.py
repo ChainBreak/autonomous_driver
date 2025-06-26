@@ -1,8 +1,10 @@
+import random
 import click
 from dataset import RecordedDataset
 from history_digest import HistoryDigest
 from game import Game
 from pathlib import Path
+from action_categorizer import ActionCategorizer
 
 @click.group()
 def cli():
@@ -24,8 +26,13 @@ def train(data_dir: Path):
     """Train the autonomous driver model"""
     click.echo(f"Training model for {data_dir}")
     # TODO: Implement the actual training logic
-    history_digest = HistoryDigest.from_window_growth_rate(num_windows=4, growth_rate=2.0)
-    dataset = RecordedDataset(data_dir=data_dir, history_digest=history_digest)
+    history_digest = HistoryDigest.from_window_growth_rate(num_windows=8, growth_rate=2.0)
+    action_categorizer = ActionCategorizer(action_vector_length=4)
+    dataset = RecordedDataset(data_dir=data_dir, history_digest=history_digest, action_categorizer=action_categorizer)
+
+    for i in range(10):
+        item = dataset[random.randint(0, len(dataset)-1)]
+        print(item)
 
 
 @cli.command()
