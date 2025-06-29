@@ -1,0 +1,10 @@
+history_digest:
+  num_windows: 10
+  growth_rate: 1.0
+
+action_vector_length: 4
+
+data_dir: "recorded_data"
+
+batch_size: 32
+image_size: 64
