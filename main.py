@@ -1,10 +1,9 @@
-import random
 import click
-from dataset import RecordedDataset
-from history_digest import HistoryDigest
 from game import Game
 from pathlib import Path
-from action_categorizer import ActionCategorizer
+from lit_module import LitModule
+import lightning as L
+import yaml
 
 @click.group()
 def cli():
@@ -21,37 +20,23 @@ def run(model_path: Path):
 
 
 @cli.command()
-@click.option('--data-dir', type=Path, help='Path to the data directory')
-def train(data_dir: Path):
+@click.option('--config-path', type=Path, required=True, help='Path to the config file')
+@click.option('--checkpoint-path', type=Path, help='Path to the checkpoint file')
+def train(config_path: Path, checkpoint_path: Path):
     """Train the autonomous driver model"""
-    click.echo(f"Training model for {data_dir}")
-    # TODO: Implement the actual training logic
-    history_digest = HistoryDigest.from_window_growth_rate(num_windows=8, growth_rate=2.0)
-    action_categorizer = ActionCategorizer(action_vector_length=4)
-    dataset = RecordedDataset(data_dir=data_dir, history_digest=history_digest, action_categorizer=action_categorizer)
 
-    for i in range(10):
-        item = dataset[random.randint(0, len(dataset)-1)]
-        print(item)
+    config = load_config(config_path)
 
+    model = LitModule(config)
 
-@cli.command()
-def test():
-    target = 0.99
-    for i in range(10):
-        steps = 2**i
-        a = 1 - (1-target)**(1/steps)
-        print(f"{steps} {a:.2f}")
+    trainer = L.Trainer(max_epochs=10)
 
+    trainer.fit(model)
 
-    x=1
-    y = 0
-    y_initial = y
-    a = 0.1
-    for i in range(10):
-        y += a * (x- y )
-        y_ = y_initial + (1-(1-a)**(i+1)) * (x-y_initial)
-        print(f"{x:.2f} {y:.2f} {y_:.2f}")
+def load_config(config: Path):
+    with open(config, 'r') as f:
+        return yaml.load(f, Loader=yaml.SafeLoader)
+   
 
 if __name__ == '__main__':
     cli()

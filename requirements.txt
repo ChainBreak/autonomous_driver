@@ -1,7 +1,9 @@
 pytest
 pygame
 torch
+lightning
 opencv-python
 numpy
 click
 pillow
+torchvision
