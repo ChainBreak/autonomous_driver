@@ -7,6 +7,7 @@ from action_categorizer import ActionCategorizer
 import torch.nn as nn
 from pathlib import Path
 from torchvision import transforms
+import model
 
 class LitModule(L.LightningModule):
     """Custom trainer class that extends lightning.Trainer."""
@@ -14,8 +15,14 @@ class LitModule(L.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.save_hyperparameters(config)
+        p = self.hparams
 
-        self.conv = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.model = model.Model(
+            num_action_classes=2**p.action_vector_length,
+            action_history_shape=(p.history_digest["num_windows"], p.action_vector_length),
+        )
+
+        self.criterion = nn.CrossEntropyLoss()
         
 
     def train_dataloader(self) -> DataLoader:
@@ -53,5 +60,14 @@ class LitModule(L.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=0.001)
 
     def training_step(self, batch, batch_idx):
-        print("training_step")
-        return 0
+        
+        frame = batch["frame"]
+        action = batch["action"]
+        action_category = batch["action_category"]
+        action_history = batch["action_history"]
+
+        action_logits = self.model(frame, action_history)
+        loss = self.criterion(action_logits, action_category)
+        self.log("train_loss", loss)
+        return loss
+    
