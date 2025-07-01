@@ -8,6 +8,7 @@ import torch.nn as nn
 from pathlib import Path
 from torchvision import transforms
 import model
+import numpy as np
 
 class LitModule(L.LightningModule):
     """Custom trainer class that extends lightning.Trainer."""
@@ -23,25 +24,42 @@ class LitModule(L.LightningModule):
         )
 
         self.criterion = nn.CrossEntropyLoss()
-        
+    
+    def forward(self, frame: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
+        return self.model(frame, action_history)
+
+    def create_history_digest(self) -> HistoryDigest:
+        """Create HistoryDigest instance from config parameters."""
+        p = self.hparams
+        history_digest = HistoryDigest.from_window_growth_rate(
+            num_windows=p.history_digest["num_windows"],
+            growth_rate=p.history_digest["growth_rate"],
+        )
+        history_digest.fill(np.zeros(p.action_vector_length))
+        return history_digest
+
+    def create_action_categorizer(self) -> ActionCategorizer:
+        """Create ActionCategorizer instance from config parameters."""
+        p = self.hparams
+        return ActionCategorizer(
+            action_vector_length=p.action_vector_length
+        )
+
+    def create_transform(self) -> transforms.Compose:
+        """Create image transforms from config parameters."""
+        p = self.hparams
+        return transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((p.image_size, p.image_size)),
+        ])
 
     def train_dataloader(self) -> DataLoader:
         print("train_dataloader")
         p = self.hparams
 
-        history_digest = HistoryDigest.from_window_growth_rate(
-            num_windows=p.history_digest["num_windows"],
-            growth_rate=p.history_digest["growth_rate"],
-        )
-
-        action_categorizer = ActionCategorizer(
-            action_vector_length=p.action_vector_length
-        )
-
-        transform = transforms.Compose([
-            transforms.Resize((p.image_size, p.image_size)),
-            transforms.ToTensor(),
-        ])
+        history_digest = self.create_history_digest()
+        action_categorizer = self.create_action_categorizer()
+        transform = self.create_transform()
 
         dataset = recorded_dataset.RecordedDataset(
             data_dir=Path(p.data_dir),

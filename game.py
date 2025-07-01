@@ -3,6 +3,9 @@ import numpy as np
 import pygame
 import config
 from recorder import Recorder
+import torch
+from pathlib import Path
+from lit_module import LitModule
 
 class Game:
     screen: pygame.Surface
@@ -11,11 +14,14 @@ class Game:
     keys_pressed: dict[int, bool] 
     running: bool = False
 
-    def __init__(self):
-        # self.setup()
-        pass
+    def __init__(self, checkpoint_path: Path):
+        self.checkpoint_path = checkpoint_path
+   
 
     def setup(self):
+
+        self.load_model(self.checkpoint_path)
+
         # Initialize pygame
         pygame.init()
         
@@ -39,6 +45,20 @@ class Game:
         pygame.display.set_caption("Autonomous Driver Simulation")
         
         self.clock = pygame.time.Clock()
+
+    def load_model(self, checkpoint_path: Path):
+        self.model = LitModule.load_from_checkpoint(checkpoint_path)
+        self.model.eval()
+        self.model.to("mps")
+
+        self.action_categorizer = self.model.create_action_categorizer()
+        self.transform = self.model.create_transform()
+
+        # Each car has its own history digest
+        self.history_digest_for_each_car = [self.model.create_history_digest() for _ in range(config.num_cars)]
+   
+
+        return self.model
 
     def run(self):
         self.running = True
@@ -143,17 +163,46 @@ class Game:
 
     def get_model_actions(self, observations: list[Observation]) -> list[Action]:
         """Get actions from AI model for each car"""
-        # For now, return random actions for each car
-        # TODO: Replace with actual model predictions
-        actions: list[Action] = []
-        for _ in observations:
-            action = np.array([
-                bool(np.random.randint(2)),
-                bool(np.random.randint(2)),
-                bool(np.random.randint(2)),
-                bool(np.random.randint(2)),
-            ])
-            actions.append(action)
+
+        # Convert view observations to tensors
+        views = [self.transform(observation.view) for observation in observations]
+        views = torch.stack(views)
+
+        # Convert action histories to tensors
+        action_histories = [history_digest.get_window_averages_numpy() for history_digest in self.history_digest_for_each_car]
+        action_histories = [torch.from_numpy(action_history) for action_history in action_histories]
+        action_histories = torch.stack(action_histories).float()
+
+        print(action_histories[0])
+
+        # Move tensors to GPU
+        views = views.to("mps")
+        action_histories = action_histories.to("mps")
+
+        # Get model predictions
+        action_logits = self.model(views, action_histories)
+        action_probs = torch.softmax(action_logits, dim=1)
+        action_categories = torch.multinomial(action_probs, num_samples=1).squeeze(1)
+
+        actions = [self.action_categorizer.to_action(category.item()) for category in action_categories]
+        # Update history digests
+        for history_digest, action in zip(self.history_digest_for_each_car, actions):
+            history_digest.push(action)
+
+        # Return actions
+        return actions
+
+        # # For now, return random actions for each car
+        # # TODO: Replace with actual model predictions
+        # actions: list[Action] = []
+        # for _ in observations:
+        #     action = np.array([
+        #         bool(np.random.randint(2)),
+        #         bool(np.random.randint(2)),
+        #         bool(np.random.randint(2)),
+        #         bool(np.random.randint(2)),
+        #     ])
+        #     actions.append(action)
         return actions
 
         

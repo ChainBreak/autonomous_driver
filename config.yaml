@@ -1,6 +1,6 @@
 history_digest:
   num_windows: 10
-  growth_rate: 1.0
+  growth_rate: 1.5
 
 action_vector_length: 4
 

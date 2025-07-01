@@ -11,10 +11,10 @@ def cli():
     pass
 
 @cli.command()
-@click.option('--model-path', type=Path, help='Path to the trained model')
-def run(model_path: Path):
+@click.option('--checkpoint-path', type=Path, help='Path to the checkpoint file')
+def run(checkpoint_path: Path):
     """Run the autonomous driver with a trained model"""
-    game = Game()
+    game = Game(checkpoint_path)
     game.setup()
     game.run()
 
@@ -29,7 +29,9 @@ def train(config_path: Path, checkpoint_path: Path):
 
     model = LitModule(config)
 
-    trainer = L.Trainer(max_epochs=10)
+    trainer = L.Trainer(
+        max_epochs=None,
+        )
 
     trainer.fit(model)
 

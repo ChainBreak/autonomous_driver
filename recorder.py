@@ -38,7 +38,7 @@ class Recorder:
         image_path = self.recording_dir / f"{self.frame_count:06d}_frame.png"
         action_path = self.recording_dir / f"{self.frame_count:06d}_action.npy"
  
-        view = cv2.cvtColor(observation.view, cv2.COLOR_BGR2RGB)
+        view = cv2.cvtColor(observation.view, cv2.COLOR_RGB2BGR)
         cv2.imwrite(str(image_path), view)
 
         np.save(action_path, action)
