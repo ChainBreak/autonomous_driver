@@ -1,3 +1,4 @@
+import time
 from environment import Environment, Car, Observation, Action
 import numpy as np
 import pygame
@@ -16,6 +17,8 @@ class Game:
 
     def __init__(self, checkpoint_path: Path):
         self.checkpoint_path = checkpoint_path
+        self.random_action_start_time = time.time()
+        self.random_action = self.generate_random_action()
    
 
     def setup(self):
@@ -75,7 +78,8 @@ class Game:
         self.handle_events()
         human_action = self.get_human_actions()
         actions = self.get_model_actions(observations)
-        actions[0] = human_action
+        modified_human_action = self.inject_random_action_when_enabled(human_action, self.recorder.recording)
+        actions[0] = modified_human_action
         self.update(actions=actions)
         self.recorder.record(observations[0], human_action)
 
@@ -116,7 +120,7 @@ class Game:
         padding = 10  # Padding between views
 
         # Draw the view of each car
-        for i, observation in enumerate(observations[:4]):
+        for i, observation in enumerate(observations):
             # Convert numpy array to pygame surface
             view = np.transpose(observation.view, (1, 0, 2)) #h,w,c to w,h,c
             view_surface = pygame.surfarray.make_surface(view)
@@ -173,8 +177,6 @@ class Game:
         action_histories = [torch.from_numpy(action_history) for action_history in action_histories]
         action_histories = torch.stack(action_histories).float()
 
-        print(action_histories[0])
-
         # Move tensors to GPU
         views = views.to("mps")
         action_histories = action_histories.to("mps")
@@ -192,18 +194,21 @@ class Game:
         # Return actions
         return actions
 
-        # # For now, return random actions for each car
-        # # TODO: Replace with actual model predictions
-        # actions: list[Action] = []
-        # for _ in observations:
-        #     action = np.array([
-        #         bool(np.random.randint(2)),
-        #         bool(np.random.randint(2)),
-        #         bool(np.random.randint(2)),
-        #         bool(np.random.randint(2)),
-        #     ])
-        #     actions.append(action)
-        return actions
+    def generate_random_action(self) -> Action:
+        return np.array([ bool(np.random.randint(2)) for _ in range(4) ])
+        
+    def inject_random_action_when_enabled(self, action: Action, enable: bool):
 
+        
+        elapsed_time = time.time() - self.random_action_start_time 
+        if elapsed_time < config.random_action_on_duration and enable:
+            action= self.random_action
+            print("Random action injected", action)
+
+        if elapsed_time > config.random_action_off_duration + config.random_action_on_duration:
+            self.random_action_start_time = time.time()
+            self.random_action = self.generate_random_action()
+    
+        return action
         
 

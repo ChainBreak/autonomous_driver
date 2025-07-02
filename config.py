@@ -9,7 +9,7 @@ training_width = 64
 training_height = 64
 view_display_width = 100
 view_display_height = 100
-num_cars = 5
+num_cars = 10
 
 car_width = 6
 car_height = 10 
@@ -21,3 +21,5 @@ car_steering_ratio_speed = 15 #deg/distance/second
 map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg"
 
 recording_dir = project_root / "recorded_data"
+random_action_on_duration = 0.5
+random_action_off_duration = 5
