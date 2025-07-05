@@ -21,5 +21,5 @@ car_steering_ratio_speed = 15 #deg/distance/second
 map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg"
 
 recording_dir = project_root / "recorded_data"
-random_action_on_duration = 0.5
-random_action_off_duration = 5
+random_action_on_duration = 0.1
+random_action_off_duration = 0.1

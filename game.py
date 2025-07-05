@@ -59,7 +59,7 @@ class Game:
 
         # Each car has its own history digest
         self.history_digest_for_each_car = [self.model.create_history_digest() for _ in range(config.num_cars)]
-   
+        print(self.history_digest_for_each_car[0])
 
         return self.model
 
@@ -202,7 +202,8 @@ class Game:
         
         elapsed_time = time.time() - self.random_action_start_time 
         if elapsed_time < config.random_action_on_duration and enable:
-            action= self.random_action
+            # left, right, forward, backward
+            action[0:2] = self.random_action[0:2]
             print("Random action injected", action)
 
         if elapsed_time > config.random_action_off_duration + config.random_action_on_duration:

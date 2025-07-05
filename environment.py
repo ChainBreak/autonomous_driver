@@ -62,6 +62,7 @@ class Car:
         self.length = config.car_height  # car length in pixels
         self.view_width = config.view_width
         self.view_height = config.view_height
+        self.random_action_enabled = False
 
 
     def update(self, action: "Action", dt: float):
@@ -74,8 +75,8 @@ class Car:
             acceleration = config.car_acceleration * dt
         else:
             acceleration = config.car_deceleration * dt
-        self.speed += np.clip(target_speed - self.speed, -acceleration, acceleration)
 
+        self.speed += np.clip(target_speed - self.speed, -acceleration, acceleration)
         # Steering ratio connect distance to degrees turned.
         # This is a simple model of the car's steering.
         steering_ratio_target = config.car_max_steering_ratio * right - config.car_max_steering_ratio * left

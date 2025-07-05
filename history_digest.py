@@ -1,4 +1,5 @@
 from collections import deque
+from typing import override
 import numpy as np
 class HistoryDigest:
 
@@ -10,7 +11,6 @@ class HistoryDigest:
         return cls(window_sizes)
 
     def __init__(self, window_sizes:list[int]):
-
         self.windows = self._build_window_chain(window_sizes)
         self.total_length = sum(window_sizes)
 
@@ -42,6 +42,12 @@ class HistoryDigest:
         """Fill all windows with the same value"""
         for _ in range(self.total_length):
             self.push(value)
+
+    @override
+    def __str__(self) -> str:
+        window_sizes = [str(window.window_size) for window in self.windows]
+        window_sizes_str = ", ".join(window_sizes)
+        return f"HistoryDigest: Total length {self.total_length}, window sizes: {window_sizes_str}"
 
 class RollingWindowChain:
     """
