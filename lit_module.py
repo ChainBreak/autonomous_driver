@@ -36,6 +36,7 @@ class LitModule(L.LightningModule):
             growth_rate=p.history_digest["growth_rate"],
         )
         history_digest.fill(np.zeros(p.action_vector_length))
+
         return history_digest
 
     def create_action_categorizer(self) -> ActionCategorizer:
@@ -60,6 +61,8 @@ class LitModule(L.LightningModule):
         history_digest = self.create_history_digest()
         action_categorizer = self.create_action_categorizer()
         transform = self.create_transform()
+
+        print(history_digest)
 
         dataset = recorded_dataset.RecordedDataset(
             data_dir=Path(p.data_dir),

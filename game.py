@@ -203,6 +203,7 @@ class Game:
         elapsed_time = time.time() - self.random_action_start_time 
         if elapsed_time < config.random_action_on_duration and enable:
             # left, right, forward, backward
+            action = action.copy()
             action[0:2] = self.random_action[0:2]
             print("Random action injected", action)
 
