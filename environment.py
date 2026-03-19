@@ -67,11 +67,14 @@ class Car:
 
     def update(self, action: "Action", dt: float):
 
-        left, right, forward, backward = action
+        left, right, forward, brake, reverse = action
 
         # Update the speed
-        target_speed = config.car_max_speed * forward - config.car_max_speed * backward
-        if forward or backward:
+        target_speed = config.car_max_speed * forward - config.car_max_speed * reverse
+        if brake:
+            target_speed = 0
+            
+        if forward or reverse or brake:
             acceleration = config.car_acceleration * dt
         else:
             acceleration = config.car_deceleration * dt

@@ -14,6 +14,10 @@ class Game:
     env: Environment
     keys_pressed: dict[int, bool] 
     running: bool = False
+    model: LitModule | None = None
+    action_categorizer = None
+    transform = None
+    history_digest_for_each_car = None
 
     def __init__(self, checkpoint_path: Path):
         self.checkpoint_path = checkpoint_path
@@ -50,6 +54,9 @@ class Game:
         self.clock = pygame.time.Clock()
 
     def load_model(self, checkpoint_path: Path):
+        if checkpoint_path is None:
+            return None
+        
         self.model = LitModule.load_from_checkpoint(checkpoint_path)
         self.model.eval()
         self.model.to("mps")
@@ -61,7 +68,6 @@ class Game:
         self.history_digest_for_each_car = [self.model.create_history_digest() for _ in range(config.num_cars)]
         print(self.history_digest_for_each_car[0])
 
-        return self.model
 
     def run(self):
         self.running = True
@@ -158,8 +164,9 @@ class Game:
         action = np.array([
             self.keys_pressed[pygame.K_LEFT],
             self.keys_pressed[pygame.K_RIGHT],
-            self.keys_pressed[pygame.K_UP],
-            self.keys_pressed[pygame.K_DOWN],
+            self.keys_pressed[pygame.K_UP],#accelerate
+            self.keys_pressed[pygame.K_DOWN],#brake
+            self.keys_pressed[pygame.K_RSHIFT],#reverse
         ])
             
         return action
@@ -167,6 +174,8 @@ class Game:
 
     def get_model_actions(self, observations: list[Observation]) -> list[Action]:
         """Get actions from AI model for each car"""
+        if self.model is None:
+            return [self.generate_random_action() for _ in range(config.num_cars)]
 
         # Convert view observations to tensors
         views = [self.transform(observation.view) for observation in observations]
@@ -195,7 +204,7 @@ class Game:
         return actions
 
     def generate_random_action(self) -> Action:
-        return np.array([ bool(np.random.randint(2)) for _ in range(4) ])
+        return np.array([ bool(np.random.randint(2)) for _ in range(5) ])
         
     def inject_random_action_when_enabled(self, action: Action, enable: bool):
 
