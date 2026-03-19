@@ -1,4 +1,3 @@
-import time
 from environment import Environment, Car, Observation, Action
 import numpy as np
 import pygame
@@ -8,22 +7,21 @@ import torch
 from pathlib import Path
 from lit_module import LitModule
 
+
 class Game:
     screen: pygame.Surface
     clock: pygame.time.Clock
     env: Environment
-    keys_pressed: dict[int, bool] 
+    keys_pressed: dict[int, bool]
     running: bool = False
     model: LitModule | None = None
     action_categorizer = None
     transform = None
     history_digest_for_each_car = None
+    autopilot_enabled: bool = True
 
     def __init__(self, checkpoint_path: Path):
         self.checkpoint_path = checkpoint_path
-        self.random_action_start_time = time.time()
-        self.random_action = self.generate_random_action()
-   
 
     def setup(self):
 
@@ -34,7 +32,7 @@ class Game:
         
         # Create environment with a blank map
         self.env = Environment(config.map_path)
-        self.recorder = Recorder(config.recording_dir)
+        self.recorder = Recorder(config.recording_dir, digest_window=config.recording_digest_window)
         
         # Generate all the cars
         for _ in range(config.num_cars):
@@ -83,24 +81,24 @@ class Game:
         self.draw_screen(observations)
         self.handle_events()
         human_action = self.get_human_actions()
+        if np.any(human_action):
+            self.autopilot_enabled = False
         actions = self.get_model_actions(observations)
-        modified_human_action = self.inject_random_action_when_enabled(human_action, self.recorder.recording)
-        actions[0] = modified_human_action
+        actions[0] = actions[0] if self.autopilot_enabled else human_action
         self.update(actions=actions)
-        self.recorder.record(observations[0], human_action)
+        self.recorder.record(observations[0], actions[0], autopilot_on=self.autopilot_enabled)
 
     def handle_events(self):
-        # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self.recorder.toggle_recording()
+                if event.key == pygame.K_a:
+                    self.autopilot_enabled = not self.autopilot_enabled
 
         self.keys_pressed = pygame.key.get_pressed()
-
 
     def update(self, actions: list[Action]):
         dt = 1/config.fps   
@@ -143,13 +141,23 @@ class Game:
             # Draw the view
             self.screen.blit(view_surface, (x, y))
 
+        # Draw Recording / Autopilot state labels (grey when off, green when on)
+        font = pygame.font.SysFont(None, 24)
+        padding = 10
+        rec_color = (0, 255, 0) if self.recorder.recording else (128, 128, 128)
+        auto_color = (0, 255, 0) if self.autopilot_enabled else (128, 128, 128)
+        rec_text = font.render(f"Recording: {'ON' if self.recorder.recording else 'OFF'}", True, rec_color)
+        auto_text = font.render(f"Autopilot: {'ON' if self.autopilot_enabled else 'OFF'}", True, auto_color)
+        self.screen.blit(rec_text, (padding, padding))
+        self.screen.blit(auto_text, (padding, padding + rec_text.get_height() + 4))
+
         # Draw red border when recording
         if self.recorder.recording:
             pygame.draw.rect(
                 self.screen,
-                (255, 0, 0),  # Red color
+                (255, 0, 0),
                 (0, 0, self.screen.get_width(), self.screen.get_height()),
-                2  # Border thickness
+                2,
             )
 
         # Update the display
@@ -204,22 +212,5 @@ class Game:
         return actions
 
     def generate_random_action(self) -> Action:
-        return np.array([ bool(np.random.randint(2)) for _ in range(5) ])
-        
-    def inject_random_action_when_enabled(self, action: Action, enable: bool):
-
-        
-        elapsed_time = time.time() - self.random_action_start_time 
-        if elapsed_time < config.random_action_on_duration and enable:
-            # left, right, forward, backward
-            action = action.copy()
-            action[0:2] = self.random_action[0:2]
-            print("Random action injected", action)
-
-        if elapsed_time > config.random_action_off_duration + config.random_action_on_duration:
-            self.random_action_start_time = time.time()
-            self.random_action = self.generate_random_action()
-    
-        return action
-        
+        return np.array([bool(np.random.randint(2)) for _ in range(5)])
 

@@ -21,5 +21,6 @@ car_steering_ratio_speed = 15 #deg/distance/second
 map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg"
 
 recording_dir = project_root / "recorded_data"
-random_action_on_duration = 0.1
-random_action_off_duration = 0.1
+
+# Number of frames to keep when recording with autopilot on (matches HistoryDigest total_length for num_windows=12, growth_rate=1.5)
+recording_digest_window = 233

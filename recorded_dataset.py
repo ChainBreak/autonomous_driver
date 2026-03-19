@@ -37,44 +37,53 @@ class RecordedDataset(Dataset):
             )
         return frame_path_tuples
 
-    def preprocess_single_recording(self, recording_dir:Path):
-
-        frame_path_tuples = self.get_frame_path_tuples(recording_dir)
-
-        if self.check_preprocessing_complete(frame_path_tuples):
-            return frame_path_tuples
+    def preprocess_single_recording(self, recording_dir: Path) -> list[tuple[Path, Path, Path]]:
+        """Run history digest over ALL frames in order; only frames with training_marker.txt are added to the training list."""
+        all_tuples = self.get_all_frames_ordered(recording_dir)
+        marked_tuples = [t for t in all_tuples if self.has_training_marker(t[0])]
+        if not marked_tuples:
+            return []
+        if self.check_preprocessing_complete(marked_tuples):
+            return marked_tuples
 
         print(f"Preprocessing {recording_dir}")
-        for i, (frame_path, action_path, history_path) in enumerate(frame_path_tuples):
+        window_sizes = [w.window_size for w in self.history_digest.windows]
+        digest = HistoryDigest(window_sizes)
+        training_list: list[tuple[Path, Path, Path]] = []
+
+        for i, (frame_path, action_path, history_path) in enumerate(all_tuples):
             action = np.load(action_path)
-
             if i == 0:
-                # Fill the history digest with the first action
-                self.history_digest.fill(action)
+                digest.fill(action)
+            if self.has_training_marker(frame_path):
+                action_history = digest.get_window_averages_numpy()
+                history_path.parent.mkdir(parents=True, exist_ok=True)
+                np.save(history_path, action_history)
+                training_list.append((frame_path, action_path, history_path))
+            digest.push(action)
 
-            # Get the history digest and save it
-            action_history = self.history_digest.get_window_averages_numpy()
-            np.save(history_path, action_history)
-            
-            # Push the action to the history digest
-            self.history_digest.push(action)
+        return training_list
 
-        return frame_path_tuples
+    def check_preprocessing_complete(self, frame_path_tuples: list[tuple[Path, Path, Path]]) -> bool:
+        """Preprocessing is complete if the first and last (marked) history paths exist."""
+        if not frame_path_tuples:
+            return True
+        return frame_path_tuples[0][2].exists() and frame_path_tuples[-1][2].exists()
 
-    def check_preprocessing_complete(self, frame_path_tuples:list[tuple[Path, Path, Path]]):
-        """
-        Preprocessing is complete if the first and last history paths exist.
-        """
-        first_history_path = frame_path_tuples[0][2]
-        last_history_path = frame_path_tuples[-1][2]
-        return first_history_path.exists() and last_history_path.exists()
-
-    def get_frame_path_tuples(self, recording_dir:Path):
+    def get_all_frames_ordered(self, recording_dir: Path) -> list[tuple[Path, Path, Path]]:
+        """All frames in chronological order: (frame_path, action_path, history_path)."""
         frame_path_list = sorted(list(recording_dir.glob("*_frame.png")))
         action_path_list = [p.with_name(p.name.replace("_frame.png", "_action.npy")) for p in frame_path_list]
         history_path_list = [p.with_name(p.name.replace("_frame.png", "_history.npy")) for p in frame_path_list]
         history_path_list = [self.map_path_to_cache_path(p) for p in history_path_list]
         return list(zip(frame_path_list, action_path_list, history_path_list))
+
+    @staticmethod
+    def has_training_marker(frame_path: Path) -> bool:
+        """True if this frame has a training_marker.txt file (human override)."""
+        stem = frame_path.stem.replace("_frame", "")
+        marker = frame_path.parent / f"{stem}_training_marker.txt"
+        return marker.exists()
 
     def map_path_to_cache_path(self, path:Path):
         relative_path = path.relative_to(self.data_dir)

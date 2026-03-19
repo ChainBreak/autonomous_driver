@@ -89,6 +89,6 @@ class LitModule(L.LightningModule):
 
         action_logits = self.model(frame, action_history)
         loss = self.criterion(action_logits, action_category)
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, prog_bar=True)
         return loss
     
