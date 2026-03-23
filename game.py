@@ -18,7 +18,9 @@ class Game:
     action_categorizer = None
     transform = None
     history_digest_for_each_car = None
-    autopilot_enabled: bool = True
+    autopilot_on: bool = True
+    recording_enabled: bool = False
+    recording_on: bool = False
 
     def __init__(self, checkpoint_path: Path):
         self.checkpoint_path = checkpoint_path
@@ -78,15 +80,16 @@ class Game:
 
     def loop(self):
         observations = self.get_observations()
-        self.draw_screen(observations)
         self.handle_events()
         human_action = self.get_human_actions()
         if np.any(human_action):
-            self.autopilot_enabled = False
+            self.autopilot_on = False
+        self.recording_on = self.recording_enabled and not self.autopilot_on
+        self.draw_screen(observations)
         actions = self.get_model_actions(observations)
-        actions[0] = actions[0] if self.autopilot_enabled else human_action
+        actions[0] = actions[0] if self.autopilot_on else human_action
         self.update(actions=actions)
-        self.recorder.record(observations[0], actions[0], autopilot_on=self.autopilot_enabled)
+        self.recorder.update(observations[0], actions[0], record=self.recording_on)
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -94,9 +97,9 @@ class Game:
                 self.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    self.recorder.toggle_recording()
+                    self.recording_enabled = not self.recording_enabled
                 if event.key == pygame.K_a:
-                    self.autopilot_enabled = not self.autopilot_enabled
+                    self.autopilot_on = not self.autopilot_on
 
         self.keys_pressed = pygame.key.get_pressed()
 
@@ -144,15 +147,26 @@ class Game:
         # Draw Recording / Autopilot state labels (grey when off, green when on)
         font = pygame.font.SysFont(None, 24)
         padding = 10
-        rec_color = (0, 255, 0) if self.recorder.recording else (128, 128, 128)
-        auto_color = (0, 255, 0) if self.autopilot_enabled else (128, 128, 128)
-        rec_text = font.render(f"Recording: {'ON' if self.recorder.recording else 'OFF'}", True, rec_color)
-        auto_text = font.render(f"Autopilot: {'ON' if self.autopilot_enabled else 'OFF'}", True, auto_color)
-        self.screen.blit(rec_text, (padding, padding))
-        self.screen.blit(auto_text, (padding, padding + rec_text.get_height() + 4))
+        rec_color = (0, 255, 0) if self.recording_enabled else (128, 128, 128)
+        auto_color = (0, 255, 0) if self.autopilot_on else (128, 128, 128)
+        rec_text = font.render(
+            f"Recording: {'Enabled' if self.recording_enabled else 'Disabled'}",
+            True,
+            rec_color,
+        )
+        auto_text = font.render(f"Autopilot: {'ON' if self.autopilot_on else 'OFF'}", True, auto_color)
+        right_x = self.screen.get_width() - padding
+        rec_x = right_x - rec_text.get_width()
+        auto_x = right_x - auto_text.get_width()
+        line_gap = 4
+        self.screen.blit(rec_text, (rec_x, padding))
+        self.screen.blit(
+            auto_text,
+            (auto_x, padding + rec_text.get_height() + line_gap),
+        )
 
-        # Draw red border when recording
-        if self.recorder.recording:
+        # Draw red border when actively recording (human + recording mode)
+        if self.recording_on:
             pygame.draw.rect(
                 self.screen,
                 (255, 0, 0),

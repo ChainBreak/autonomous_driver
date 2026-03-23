@@ -7,7 +7,6 @@ from collections import deque
 
 
 class Recorder:
-    recording: bool = False
     frame_count: int = 0
     data_dir: Path = Path("")
     recording_dir: Path = Path("")
@@ -16,26 +15,13 @@ class Recorder:
     def __init__(self, output_dir: Path, digest_window: int = 233):
         self.data_dir = output_dir
         self.digest_window = digest_window
-        self._frames_to_delete: deque = deque()
+        self._frames_to_delete: deque[list[Path]] = deque()
 
-    def start_recording(self):
         datetime_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.recording_dir = self.data_dir / f"recording_{datetime_str}"
         self.recording_dir.mkdir(parents=True, exist_ok=True)
         self.frame_count = 0
-        self._frames_to_delete.clear()
-        self.recording = True
-        print(f"Recording started to {self.recording_dir}")
-
-    def stop_recording(self):
-        self.recording = False
-        print(f"Recording stopped")
-
-    def toggle_recording(self):
-        if self.recording:
-            self.stop_recording()
-        else:
-            self.start_recording()
+        print(f"Recording directory: {self.recording_dir}")
 
     def _delete_frames_outside_digest_window(self) -> None:
         while len(self._frames_to_delete) > self.digest_window:
@@ -44,10 +30,13 @@ class Recorder:
                 if p.exists():
                     p.unlink()
 
-    def record(self, observation: Observation, action: Action, *, autopilot_on: bool):
-        if not self.recording:
-            return
-
+    def update(
+        self,
+        observation: Observation,
+        action: Action,
+        *,
+        record: bool,
+    ) -> None:
         image_path = self.recording_dir / f"{self.frame_count:06d}_frame.png"
         action_path = self.recording_dir / f"{self.frame_count:06d}_action.npy"
 
@@ -55,15 +44,12 @@ class Recorder:
         cv2.imwrite(str(image_path), view)
         np.save(action_path, action)
 
-        if autopilot_on:
-            self._frames_to_delete.append((image_path, action_path))
-            self._delete_frames_outside_digest_window()
-        else:
-            self._frames_to_delete.clear()
+        if record:
             marker_path = self.recording_dir / f"{self.frame_count:06d}_training_marker.txt"
             marker_path.touch()
+            self._frames_to_delete.clear()
+        else:
+            self._frames_to_delete.append([image_path, action_path])
+            self._delete_frames_outside_digest_window()
 
         self.frame_count += 1
-
-
-  
