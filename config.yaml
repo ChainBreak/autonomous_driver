@@ -6,5 +6,5 @@ action_vector_length: 5
 
 data_dir: "recorded_data"
 
-batch_size: 64
+batch_size: 128
 image_size: 64

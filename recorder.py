@@ -10,9 +10,9 @@ class Recorder:
     frame_count: int = 0
     data_dir: Path = Path("")
     recording_dir: Path = Path("")
-    digest_window: int = 233
+    digest_window: int
 
-    def __init__(self, output_dir: Path, digest_window: int = 233):
+    def __init__(self, output_dir: Path, digest_window: int):
         self.data_dir = output_dir
         self.digest_window = digest_window
         self._frames_to_delete: deque[list[Path]] = deque()
