@@ -1,6 +1,12 @@
 from pathlib import Path
 
+from history_digest import HistoryDigest
+
 project_root = Path(__file__).parent
+
+# Must match defaults in config.yaml (history_digest / frame_history_digest) for Recorder window sizing.
+_action_digest = HistoryDigest.from_window_growth_rate(num_windows=12, growth_rate=1.5)
+_frame_digest = HistoryDigest.from_window_growth_rate(num_windows=12, growth_rate=1.5)
 
 fps = 15
 view_width = 96
@@ -22,5 +28,5 @@ map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-3
 
 recording_dir = project_root / "recorded_data"
 
-# Number of frames to keep when recording with autopilot on (matches HistoryDigest total_length for num_windows=12, growth_rate=1.5)
-recording_digest_window = 253
+# Frames to retain when not recording (warm-up for both digests); max of action and frame digest chain lengths.
+recording_digest_window = max(_action_digest.total_length, _frame_digest.total_length)

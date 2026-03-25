@@ -18,6 +18,7 @@ class Game:
     action_categorizer = None
     transform = None
     history_digest_for_each_car = None
+    frame_history_digest_for_each_car = None
     autopilot_on: bool = True
     recording_enabled: bool = False
     recording_on: bool = False
@@ -64,9 +65,11 @@ class Game:
         self.action_categorizer = self.model.create_action_categorizer()
         self.transform = self.model.create_transform()
 
-        # Each car has its own history digest
+        # Each car has its own action and frame history digests
         self.history_digest_for_each_car = [self.model.create_history_digest() for _ in range(config.num_cars)]
+        self.frame_history_digest_for_each_car = [self.model.create_frame_history_digest() for _ in range(config.num_cars)]
         print(self.history_digest_for_each_car[0])
+        print(self.frame_history_digest_for_each_car[0])
 
 
     def run(self):
@@ -199,30 +202,39 @@ class Game:
         if self.model is None:
             return [self.generate_random_action() for _ in range(config.num_cars)]
 
-        # Convert view observations to tensors
-        views = [self.transform(observation.view) for observation in observations]
-        views = torch.stack(views)
+        # Frame history [B, N, C, H, W] and action history from digests (before push)
+        frame_histories = [
+            torch.from_numpy(fd.get_window_averages_numpy())
+            for fd in self.frame_history_digest_for_each_car
+        ]
+        frame_histories = torch.stack(frame_histories).float()
 
-        # Convert action histories to tensors
-        action_histories = [history_digest.get_window_averages_numpy() for history_digest in self.history_digest_for_each_car]
-        action_histories = [torch.from_numpy(action_history) for action_history in action_histories]
+        action_histories = [
+            torch.from_numpy(history_digest.get_window_averages_numpy())
+            for history_digest in self.history_digest_for_each_car
+        ]
         action_histories = torch.stack(action_histories).float()
 
-        # Move tensors to GPU
-        views = views.to("mps")
+        frame_histories = frame_histories.to("mps")
         action_histories = action_histories.to("mps")
 
         # Get model predictions
-        action_logits = self.model(views, action_histories)
+        action_logits = self.model(frame_histories, action_histories)
         action_probs = torch.softmax(action_logits, dim=1)
         action_categories = torch.multinomial(action_probs, num_samples=1).squeeze(1)
 
         actions = [self.action_categorizer.to_action(category.item()) for category in action_categories]
-        # Update history digests
-        for history_digest, action in zip(self.history_digest_for_each_car, actions):
+        # Update history digests: actions and current frame (CHW), same order as observations
+        for history_digest, frame_digest, action, observation in zip(
+            self.history_digest_for_each_car,
+            self.frame_history_digest_for_each_car,
+            actions,
+            observations,
+        ):
             history_digest.push(action)
+            frame_chw = self.transform(observation.view).numpy().astype(np.float32)
+            frame_digest.push(frame_chw)
 
-        # Return actions
         return actions
 
     def generate_random_action(self) -> Action:

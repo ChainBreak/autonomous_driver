@@ -56,7 +56,20 @@ def test_average_history_windows_from_window_growth_rate(num_windows, growth_rat
     windows = HistoryDigest.from_window_growth_rate(num_windows=num_windows, growth_rate=growth_rate)
     for window, expected_window_size in zip(windows.windows, expected_window_sizes):
         assert window.window_size == expected_window_size
-    
+
+
+def test_history_digest_chw_spatial_frames():
+    """Rolling averages over (C, H, W) tensors yield (num_windows, C, H, W)."""
+    C, H, W = 3, 4, 5
+    window_sizes = [2, 2]
+    digest = HistoryDigest(window_sizes)
+    rng = np.random.default_rng(0)
+    for _ in range(6):
+        digest.push(rng.standard_normal((C, H, W)).astype(np.float32))
+    stacked = digest.get_window_averages_numpy()
+    assert stacked.shape == (len(window_sizes), C, H, W)
+    assert np.isfinite(stacked).all()
+
 
 if __name__ == "__main__":
     pytest.main([__file__]) 

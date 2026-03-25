@@ -2,6 +2,10 @@ history_digest:
   num_windows: 12
   growth_rate: 1.5
 
+frame_history_digest:
+  num_windows: 12
+  growth_rate: 1.5
+
 action_vector_length: 5
 
 data_dir: "recorded_data"

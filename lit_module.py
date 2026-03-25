@@ -18,15 +18,23 @@ class LitModule(L.LightningModule):
         self.save_hyperparameters(config)
         p = self.hparams
 
+        frame_history_shape = (
+            p.frame_history_digest["num_windows"],
+            3,
+            p.image_size,
+            p.image_size,
+        )
+
         self.model = model.Model(
             num_action_classes=2**p.action_vector_length,
             action_history_shape=(p.history_digest["num_windows"], p.action_vector_length),
+            frame_history_shape=frame_history_shape,
         )
 
         self.criterion = nn.CrossEntropyLoss()
     
-    def forward(self, frame: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
-        return self.model(frame, action_history)
+    def forward(self, frame_history: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
+        return self.model(frame_history, action_history)
 
     def create_history_digest(self) -> HistoryDigest:
         """Create HistoryDigest instance from config parameters."""
@@ -38,6 +46,18 @@ class LitModule(L.LightningModule):
         history_digest.fill(np.zeros(p.action_vector_length))
 
         return history_digest
+
+    def create_frame_history_digest(self) -> HistoryDigest:
+        """Create frame HistoryDigest; push values are float32 (C, H, W)."""
+        p = self.hparams
+        frame_digest = HistoryDigest.from_window_growth_rate(
+            num_windows=p.frame_history_digest["num_windows"],
+            growth_rate=p.frame_history_digest["growth_rate"],
+        )
+        zeros = np.zeros((3, p.image_size, p.image_size), dtype=np.float32)
+        frame_digest.fill(zeros)
+
+        return frame_digest
 
     def create_action_categorizer(self) -> ActionCategorizer:
         """Create ActionCategorizer instance from config parameters."""
@@ -59,16 +79,20 @@ class LitModule(L.LightningModule):
         p = self.hparams
 
         history_digest = self.create_history_digest()
+        frame_history_digest = self.create_frame_history_digest()
         action_categorizer = self.create_action_categorizer()
         transform = self.create_transform()
 
         print(history_digest)
+        print(frame_history_digest)
 
         dataset = recorded_dataset.RecordedDataset(
             data_dir=Path(p.data_dir),
             history_digest=history_digest,
+            frame_history_digest=frame_history_digest,
             action_categorizer=action_categorizer,
             transform=transform,
+            image_size=p.image_size,
         )
 
         return DataLoader(
@@ -81,13 +105,11 @@ class LitModule(L.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=0.001)
 
     def training_step(self, batch, batch_idx):
-        
-        frame = batch["frame"]
-        action = batch["action"]
         action_category = batch["action_category"]
         action_history = batch["action_history"]
+        frame_history = batch["frame_history"]
 
-        action_logits = self.model(frame, action_history)
+        action_logits = self.model(frame_history, action_history)
         loss = self.criterion(action_logits, action_category)
         self.log("train_loss", loss, prog_bar=True)
         return loss
