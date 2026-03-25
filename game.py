@@ -17,7 +17,7 @@ class Game:
     model: LitModule | None = None
     action_categorizer = None
     transform = None
-    history_digest_for_each_car = None
+    action_history_digest_for_each_car = None
     frame_history_digest_for_each_car = None
     autopilot_on: bool = True
     recording_enabled: bool = False
@@ -66,9 +66,9 @@ class Game:
         self.transform = self.model.create_transform()
 
         # Each car has its own action and frame history digests
-        self.history_digest_for_each_car = [self.model.create_history_digest() for _ in range(config.num_cars)]
+        self.action_history_digest_for_each_car = [self.model.create_action_history_digest() for _ in range(config.num_cars)]
         self.frame_history_digest_for_each_car = [self.model.create_frame_history_digest() for _ in range(config.num_cars)]
-        print(self.history_digest_for_each_car[0])
+        print(self.action_history_digest_for_each_car[0])
         print(self.frame_history_digest_for_each_car[0])
 
 
@@ -210,8 +210,8 @@ class Game:
         frame_histories = torch.stack(frame_histories).float()
 
         action_histories = [
-            torch.from_numpy(history_digest.get_window_averages_numpy())
-            for history_digest in self.history_digest_for_each_car
+            torch.from_numpy(action_history_digest.get_window_averages_numpy())
+            for action_history_digest in self.action_history_digest_for_each_car
         ]
         action_histories = torch.stack(action_histories).float()
 
@@ -225,13 +225,13 @@ class Game:
 
         actions = [self.action_categorizer.to_action(category.item()) for category in action_categories]
         # Update history digests: actions and current frame (CHW), same order as observations
-        for history_digest, frame_digest, action, observation in zip(
-            self.history_digest_for_each_car,
+        for action_history_digest, frame_digest, action, observation in zip(
+            self.action_history_digest_for_each_car,
             self.frame_history_digest_for_each_car,
             actions,
             observations,
         ):
-            history_digest.push(action)
+            action_history_digest.push(action)
             frame_chw = self.transform(observation.view).numpy().astype(np.float32)
             frame_digest.push(frame_chw)
 

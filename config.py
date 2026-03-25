@@ -4,7 +4,7 @@ from history_digest import HistoryDigest
 
 project_root = Path(__file__).parent
 
-# Must match defaults in config.yaml (history_digest / frame_history_digest) for Recorder window sizing.
+# Must match defaults in config.yaml (action_history_digest / frame_history_digest) for Recorder window sizing.
 _action_digest = HistoryDigest.from_window_growth_rate(num_windows=12, growth_rate=1.5)
 _frame_digest = HistoryDigest.from_window_growth_rate(num_windows=12, growth_rate=1.5)
 

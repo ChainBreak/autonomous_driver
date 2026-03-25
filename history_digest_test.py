@@ -58,7 +58,7 @@ def test_average_history_windows_from_window_growth_rate(num_windows, growth_rat
         assert window.window_size == expected_window_size
 
 
-def test_history_digest_chw_spatial_frames():
+def test_chw_spatial_frames():
     """Rolling averages over (C, H, W) tensors yield (num_windows, C, H, W)."""
     C, H, W = 3, 4, 5
     window_sizes = [2, 2]

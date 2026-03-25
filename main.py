@@ -46,7 +46,7 @@ def train(config_path: Path, checkpoint_path: Path):
     )
 
     trainer = L.Trainer(
-        max_epochs=None,
+        max_epochs=200,
         logger=logger,
         callbacks=[checkpoint_callback],
     )

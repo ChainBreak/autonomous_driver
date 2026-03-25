@@ -9,18 +9,16 @@ from action_categorizer import ActionCategorizer
 class RecordedDataset(Dataset):
     def __init__(self,
         data_dir:Path,
-        history_digest:HistoryDigest,
+        action_history_digest:HistoryDigest,
         frame_history_digest:HistoryDigest,
         action_categorizer:ActionCategorizer,
         transform:Callable = lambda x: x,
-        image_size:int = 64,
     ):
         self.data_dir = data_dir
-        self.history_digest = history_digest
+        self.action_history_digest = action_history_digest
         self.frame_history_digest = frame_history_digest
         self.action_categorizer = action_categorizer
         self.transform = transform
-        self.image_size = image_size
 
         self.cache_dir = data_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +41,7 @@ class RecordedDataset(Dataset):
         return frame_path_tuples
 
     def cache_hash_tag(self) -> str:
-        action_part = "_".join(f"{w.window_size}" for w in self.history_digest.windows)
+        action_part = "_".join(f"{w.window_size}" for w in self.action_history_digest.windows)
         frame_part = "_".join(f"{w.window_size}" for w in self.frame_history_digest.windows)
         return f"{action_part}__{frame_part}"
 
@@ -59,33 +57,37 @@ class RecordedDataset(Dataset):
             return marked_tuples
 
         print(f"Preprocessing {recording_dir}")
-        window_sizes_action = [w.window_size for w in self.history_digest.windows]
+
+        window_sizes_action = [w.window_size for w in self.action_history_digest.windows]
         digest_action = HistoryDigest(window_sizes_action)
 
         window_sizes_frame = [w.window_size for w in self.frame_history_digest.windows]
         digest_frame = HistoryDigest(window_sizes_frame)
 
-        zeros_chw = np.zeros((3, self.image_size, self.image_size), dtype=np.float32)
-
-        for i, (frame_path, action_path, _, action_history_path, frame_history_path) in enumerate(all_tuples):
+        for i, (frame_path, action_path, training_marker_path, action_history_path, frame_history_path) in enumerate(all_tuples):
+            # load action and frame
             action = np.load(action_path)
+            frame = self.transform(Image.open(frame_path)).numpy().astype(np.float32)
 
-            frame_pil = Image.open(frame_path)
-            frame_chw = self.transform(frame_pil).numpy().astype(np.float32)
-
+            # fill the digests with zeros if it's the first frame
             if i == 0:
-                digest_action.fill(action)
-                digest_frame.fill(zeros_chw)
+                digest_action.fill(np.zeros_like(action))
+                digest_frame.fill(np.zeros_like(frame))
 
-            action_history = digest_action.get_window_averages_numpy()
-            action_history_path.parent.mkdir(parents=True, exist_ok=True)
-            np.save(action_history_path, action_history)
+            # push the frame before saving the frame history
+            digest_frame.push(frame)
 
-            frame_history = digest_frame.get_window_averages_numpy()
-            np.save(frame_history_path, frame_history)
+            if training_marker_path.exists():
+                # Collect the window averages
+                action_history = digest_action.get_window_averages_numpy()
+                frame_history = digest_frame.get_window_averages_numpy()
 
+                action_history_path.parent.mkdir(parents=True, exist_ok=True)
+                np.save(action_history_path, action_history)
+                np.save(frame_history_path, frame_history)
+
+            #action gets pushed after.
             digest_action.push(action)
-            digest_frame.push(frame_chw)
 
         self.preprocessing_complete_path(recording_dir).touch()
         return marked_tuples
@@ -101,11 +103,11 @@ class RecordedDataset(Dataset):
         frame_path_list = sorted(list(recording_dir.glob("*_frame.png")))
         action_path_list = [p.with_name(p.name.replace("_frame.png", "_action.npy")) for p in frame_path_list]
         marker_path_list = [p.with_name(p.name.replace("_frame.png", "_training_marker.txt")) for p in frame_path_list]
-        history_path_list = [p.with_name(p.name.replace("_frame.png", "_history.npy")) for p in frame_path_list]
-        history_path_list = [self.map_path_to_cache_path(p) for p in history_path_list]
+        action_history_path_list = [p.with_name(p.name.replace("_frame.png", "_history.npy")) for p in frame_path_list]
+        action_history_path_list = [self.map_path_to_cache_path(p) for p in action_history_path_list]
         frame_history_path_list = [p.with_name(p.name.replace("_frame.png", "_frame_history.npy")) for p in frame_path_list]
         frame_history_path_list = [self.map_path_to_cache_path(p) for p in frame_history_path_list]
-        return list(zip(frame_path_list, action_path_list, marker_path_list, history_path_list, frame_history_path_list))
+        return list(zip(frame_path_list, action_path_list, marker_path_list, action_history_path_list, frame_history_path_list))
 
     def map_path_to_cache_path(self, path:Path):
         relative_path = path.relative_to(self.data_dir)

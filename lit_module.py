@@ -27,7 +27,7 @@ class LitModule(L.LightningModule):
 
         self.model = model.Model(
             num_action_classes=2**p.action_vector_length,
-            action_history_shape=(p.history_digest["num_windows"], p.action_vector_length),
+            action_history_shape=(p.action_history_digest["num_windows"], p.action_vector_length),
             frame_history_shape=frame_history_shape,
         )
 
@@ -36,16 +36,16 @@ class LitModule(L.LightningModule):
     def forward(self, frame_history: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
         return self.model(frame_history, action_history)
 
-    def create_history_digest(self) -> HistoryDigest:
-        """Create HistoryDigest instance from config parameters."""
+    def create_action_history_digest(self) -> HistoryDigest:
+        """Create HistoryDigest for action history from config parameters."""
         p = self.hparams
-        history_digest = HistoryDigest.from_window_growth_rate(
-            num_windows=p.history_digest["num_windows"],
-            growth_rate=p.history_digest["growth_rate"],
+        action_history_digest = HistoryDigest.from_window_growth_rate(
+            num_windows=p.action_history_digest["num_windows"],
+            growth_rate=p.action_history_digest["growth_rate"],
         )
-        history_digest.fill(np.zeros(p.action_vector_length))
+        action_history_digest.fill(np.zeros(p.action_vector_length))
 
-        return history_digest
+        return action_history_digest
 
     def create_frame_history_digest(self) -> HistoryDigest:
         """Create frame HistoryDigest; push values are float32 (C, H, W)."""
@@ -78,21 +78,20 @@ class LitModule(L.LightningModule):
         print("train_dataloader")
         p = self.hparams
 
-        history_digest = self.create_history_digest()
+        action_history_digest = self.create_action_history_digest()
         frame_history_digest = self.create_frame_history_digest()
         action_categorizer = self.create_action_categorizer()
         transform = self.create_transform()
 
-        print(history_digest)
+        print(action_history_digest)
         print(frame_history_digest)
 
         dataset = recorded_dataset.RecordedDataset(
             data_dir=Path(p.data_dir),
-            history_digest=history_digest,
+            action_history_digest=action_history_digest,
             frame_history_digest=frame_history_digest,
             action_categorizer=action_categorizer,
             transform=transform,
-            image_size=p.image_size,
         )
 
         return DataLoader(
