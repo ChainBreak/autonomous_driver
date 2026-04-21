@@ -1,4 +1,6 @@
 from typing import Callable
+import json
+import torch
 from torch.utils.data import Dataset
 from pathlib import Path
 from history_digest import HistoryDigest
@@ -39,7 +41,7 @@ class RecordedDataset(Dataset):
         return frame_path_tuples
 
     def preprocess_single_recording(self, recording_dir: Path) -> list[tuple[Path, Path, Path, Path]]:
-        """Run history digest over ALL frames in order; only frames with training_marker.txt are added to the training list."""
+        """Run history digest over ALL frames in order; only frames with _metadata.json are added to the training list."""
         all_tuples = self.get_all_frames_ordered(recording_dir)
         marked_tuples = [t for t in all_tuples if t[2].exists()]
 
@@ -76,13 +78,13 @@ class RecordedDataset(Dataset):
 
 
     def get_all_frames_ordered(self, recording_dir: Path) -> list[tuple[Path, Path, Path, Path]]:
-        """All frames in chronological order: (frame_path, action_path, training_marker_path, history_path)."""
+        """All frames in chronological order: (frame_path, action_path, metadata_path, history_path)."""
         frame_path_list = sorted(list(recording_dir.glob("*_frame.png")))
         action_path_list = [p.with_name(p.name.replace("_frame.png", "_action.npy")) for p in frame_path_list]
-        marker_path_list = [p.with_name(p.name.replace("_frame.png", "_training_marker.txt")) for p in frame_path_list]
+        metadata_path_list = [p.with_name(p.name.replace("_frame.png", "_metadata.json")) for p in frame_path_list]
         history_path_list = [p.with_name(p.name.replace("_frame.png", "_history.npy")) for p in frame_path_list]
         history_path_list = [self.map_path_to_cache_path(p) for p in history_path_list]
-        return list(zip(frame_path_list, action_path_list, marker_path_list, history_path_list))
+        return list(zip(frame_path_list, action_path_list, metadata_path_list, history_path_list))
 
     def map_path_to_cache_path(self, path:Path):
         relative_path = path.relative_to(self.data_dir)
@@ -96,10 +98,15 @@ class RecordedDataset(Dataset):
 
     def __getitem__(self, index):
 
-        frame_path, action_path, _, action_history_path = self.frame_path_tuples[index]
+        frame_path, action_path, metadata_path, action_history_path = self.frame_path_tuples[index]
         frame = Image.open(frame_path)
         action = np.load(action_path)
         action_history = np.load(action_history_path)
+
+        with metadata_path.open(encoding="utf-8") as f:
+            metadata = json.load(f)
+        recording_mode = metadata["recording_mode"]
+        expert_action = recording_mode == "expert"
 
         frame = self.transform(frame)
         action_category = self.action_categorizer.to_category(action)
@@ -109,4 +116,5 @@ class RecordedDataset(Dataset):
             "action": action.astype(np.float32),
             "action_category": action_category.astype(np.float32),
             "action_history": action_history.astype(np.float32),
+            "expert_action": torch.tensor(expert_action, dtype=torch.bool),
         }
