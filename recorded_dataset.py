@@ -82,10 +82,16 @@ class RecordedDataset(Dataset):
         next_state_actions = state_action_paths[1:]
         
         for state_action, next_state_action in zip(state_actions, next_state_actions):
+
+            # If metadata exists then this state action is good for training
             if state_action.metadata_path.exists():
+
+                # Extract the recording mode from the json
                 with state_action.metadata_path.open(encoding="utf-8") as f:
                     metadata = json.load(f)
                 recording_type = metadata["recording_mode"]
+                
+                # Create state transition pair of state and next_state
                 state_transition = StateTransition(state_action, next_state_action)
                 state_transitions_per_recording_type[recording_type].append(state_transition)
 
