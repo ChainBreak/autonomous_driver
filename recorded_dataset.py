@@ -146,7 +146,7 @@ class RecordedDataset(IterableDataset):
             "frame": frame,
             "next_frame": next_frame,
             "action": action.astype(np.float32),
-            "action_category": action_category.astype(np.float32),
+            "action_category": action_category.astype(np.int32),
             "action_history": action_history.astype(np.float32),
             "next_action_history": next_action_history.astype(np.float32),
             "expert_action": torch.tensor(expert_action, dtype=torch.bool),

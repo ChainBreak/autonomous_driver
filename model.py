@@ -23,15 +23,43 @@ class Model(nn.Module):
             nn.ReLU(),
         )
 
-        self.action_decoder = nn.Sequential(
+        self.action_quality_decoder = nn.Sequential(
             nn.Linear(1024, 512),
             nn.ReLU(),
             nn.Linear(512, num_action_classes),
         )
 
+        self.log_temperature = nn.Parameter(torch.tensor(0.0))
+
+
     def forward(self, image, action_history):
+        # The quality return the value of each action given this state
+        action_values = self.quality(image, action_history)
+
+        # The policy is derived from the quality values. 
+        # Simply scale by the temperature and then normalize to get the policy.
+        policy_logits = self.action_values_to_policy_logits(action_values)
+
+        return policy_logits
+        
+    def quality(self, image, action_history):
         image_x = self.image_encoder(image)
         action_history_x = self.action_history_encoder(action_history)
         x = torch.cat([image_x, action_history_x], dim=1)
-        x = self.action_decoder(x)
+        x = self.action_quality_decoder(x)
         return x
+
+    def estimate_state_value(self, frame: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
+        
+        action_values = self(frame, action_history)
+
+        # The policy is derived from the quality values. 
+        # Simply scale by the temperature and then normalize to get the policy.
+        action_probs = torch.softmax(self.action_values_to_policy_logits(action_values), dim=1)
+        
+        # Get the policy weighted value of the actions.
+        value = (action_probs * action_values).sum(dim=1)
+        return value
+
+    def action_values_to_policy_logits(self, action_values: torch.Tensor) -> torch.Tensor:
+        return action_values / self.log_temperature.exp()
