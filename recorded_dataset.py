@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable
 import json
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import IterableDataset
 from pathlib import Path
 from history_digest import HistoryDigest
 import numpy as np
@@ -11,7 +11,7 @@ from action_categorizer import ActionCategorizer
 from collections import defaultdict
 import random
 
-class RecordedDataset(Dataset):
+class RecordedDataset(IterableDataset):
     def __init__(self,
         data_dir:Path,
         history_digest:HistoryDigest,
@@ -120,30 +120,20 @@ class RecordedDataset(Dataset):
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         return cache_path
     
-    def __len__(self):
-        return sum(len(transitions) for transitions in self.training_items.values())
-
-    def __getitem__(self, index):
-
-        # Randomly choose a recording mode
+    def yield_sample_dicts(self) -> dict:
         recording_mode = random.choice(list(self.training_items.keys()))
-
-        # Randomly choose a state transition for the chosen recording mode
         state_transitions = self.training_items[recording_mode]
         state_transition = random.choice(state_transitions)
 
         state_action = state_transition.state_action
         next_state_action = state_transition.next_state_action
 
-        # State 
         frame = Image.open(state_action.frame_path)
         frame = self.transform(frame)
         action_history = np.load(state_action.history_path)
 
-        # Action
         action = np.load(state_action.action_path)
 
-        # Next State
         next_frame = Image.open(next_state_action.frame_path)
         next_frame = self.transform(next_frame)
         next_action_history = np.load(next_state_action.history_path)
@@ -161,6 +151,10 @@ class RecordedDataset(Dataset):
             "next_action_history": next_action_history.astype(np.float32),
             "expert_action": torch.tensor(expert_action, dtype=torch.bool),
         }
+      
+    def __iter__(self):
+        while True:
+            yield self.yield_sample_dicts()
 
 @dataclass(frozen=True, slots=True)
 class StateTransition:

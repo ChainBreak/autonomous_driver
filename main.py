@@ -49,6 +49,7 @@ def train(config_path: Path, checkpoint_path: Path):
         max_epochs=None,
         logger=logger,
         callbacks=[checkpoint_callback],
+
     )
 
     trainer.fit(

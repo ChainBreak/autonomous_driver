@@ -72,9 +72,8 @@ class LitModule(L.LightningModule):
         )
 
         return DataLoader(
-            dataset=dataset, 
+            dataset=dataset,
             batch_size=p.batch_size,
-            shuffle=True,
         )
 
     def configure_optimizers(self):
