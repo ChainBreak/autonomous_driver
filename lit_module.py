@@ -85,7 +85,8 @@ class LitModule(L.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.model.parameters(), lr=0.001)
+        p = self.hparams
+        return torch.optim.Adam(self.model.parameters(), lr=p.learning_rate)
 
     def training_step(self, batch, batch_idx):
         p = self.hparams
@@ -118,7 +119,7 @@ class LitModule(L.LightningModule):
 
         # calibrate policy temperature
         policy_logits = self.model.action_values_to_policy_logits(action_values.detach())
-        loss_policy = F.cross_entropy(policy_logits, action_category)
+        loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
         
         expert_state_action_value = next_state_value[expert_action].mean()
         other_state_action_value = next_state_value[~expert_action].mean()

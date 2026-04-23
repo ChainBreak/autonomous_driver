@@ -6,9 +6,11 @@ action_vector_length: 5
 
 data_dir: "recorded_data"
 
+learning_rate: 0.001
 batch_size: 32
 image_size: 64
 
 ema_decay: 0.999
 
 discount_factor: 0.99
+limit_train_batches: 1000
