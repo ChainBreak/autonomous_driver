@@ -92,7 +92,6 @@ class LitModule(L.LightningModule):
         p = self.hparams
         self.model_ema.update_parameters(self.model)
 
-        
         frame = batch["frame"]
         action_history = batch["action_history"]
         next_frame = batch["next_frame"]
@@ -115,23 +114,24 @@ class LitModule(L.LightningModule):
         chosen_action_value = action_values.gather(
             1, action_category.long().unsqueeze(1)
         ).squeeze(1)
+        
         loss_quality = F.mse_loss(chosen_action_value, quality_value_target.detach())
 
         # calibrate policy temperature
-        policy_logits = self.model.action_values_to_policy_logits(action_values.detach())
-        loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
+        policy_logits = self.model.action_values_to_policy_logits(action_values[expert_action].detach())
+        loss_policy = F.cross_entropy(policy_logits, action_category[expert_action])
         
         expert_state_action_value = next_state_value[expert_action].mean()
         other_state_action_value = next_state_value[~expert_action].mean()
 
 
         loss = loss_quality + loss_policy
-        self.log("train_loss", loss, prog_bar=True)
-        self.log("expert_state_action_value", expert_state_action_value, prog_bar=False)
-        self.log("other_state_action_value", other_state_action_value, prog_bar=False)
+        self.log("state_action_value/expert", expert_state_action_value, prog_bar=False)
+        self.log("state_action_value/other", other_state_action_value, prog_bar=False)
         self.log("temperature", self.model.log_temperature.exp(), prog_bar=False)
-        self.log("loss_quality", loss_quality, prog_bar=False)
-        self.log("loss_policy", loss_policy, prog_bar=False)
+        self.log("loss/train", loss, prog_bar=True)
+        self.log("loss/quality", loss_quality, prog_bar=False)
+        self.log("loss/policy", loss_policy, prog_bar=False)
         return loss
 
 

@@ -33,6 +33,9 @@ class Model(nn.Module):
 
 
     def forward(self, image, action_history):
+        return self.policy(image, action_history)
+
+    def policy(self, image, action_history):
         # The quality return the value of each action given this state
         action_values = self.quality(image, action_history)
 
@@ -51,7 +54,7 @@ class Model(nn.Module):
 
     def estimate_state_value(self, frame: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
         
-        action_values = self(frame, action_history)
+        action_values = self.quality(frame, action_history)
 
         # The policy is derived from the quality values. 
         # Simply scale by the temperature and then normalize to get the policy.
