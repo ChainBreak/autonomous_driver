@@ -132,7 +132,6 @@ class RecordedDataset(IterableDataset):
         frame = self.transform(frame)
         action_history = np.load(state_action.history_path)
 
-        action = np.load(state_action.action_path)
 
         next_frame = Image.open(next_state_action.frame_path)
         next_frame = self.transform(next_frame)
@@ -140,6 +139,7 @@ class RecordedDataset(IterableDataset):
 
         expert_action = recording_mode == "expert"
 
+        action = np.load(state_action.action_path)
         action_category = self.action_categorizer.to_category(action)
 
         return {

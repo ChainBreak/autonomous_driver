@@ -1,5 +1,6 @@
 from typing import final
 import lightning as L
+from lightning.pytorch.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 import torch
 from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
@@ -13,6 +14,10 @@ from torchvision import transforms
 import model
 import numpy as np
 import itertools
+
+# Notes:
+# - Using an separate parameter just for temperature is fine.
+
 @final
 class LitModule(L.LightningModule):
     """Custom trainer class that extends lightning.Trainer."""
@@ -92,7 +97,7 @@ class LitModule(L.LightningModule):
         p = self.hparams
         self.model_ema.update_parameters(self.model)
 
-        
+        # Collect the tensors from the batch
         frame = batch["frame"]
         action_history = batch["action_history"]
         next_frame = batch["next_frame"]
@@ -100,39 +105,90 @@ class LitModule(L.LightningModule):
         expert_action = batch["expert_action"]
         action_category = batch["action_category"]
 
-        # Estimate the value of the next state
-        next_state_value = self.model_ema.module.estimate_state_value(
-            frame=next_frame,
-            action_history=next_action_history,
-        )
-
-        # Experate state actions get a reward of 1, all other actions get a reward of 0.
-        reward = 1*expert_action
-
-        quality_value_target = reward + p.discount_factor * next_state_value
-
+        # Get the quality of each action given the current state.
         action_values = self.model.quality(frame, action_history)
+
+        # Get the quality of the chosen action.
         chosen_action_value = action_values.gather(
             1, action_category.long().unsqueeze(1)
         ).squeeze(1)
-        loss_quality = F.mse_loss(chosen_action_value, quality_value_target.detach())
+
+        
+        # Estimate the value of the next state
+        with torch.no_grad():
+            next_state_value: torch.Tensor = self.model_ema.module.soft_state_value(
+                frame=next_frame,
+                action_history=next_action_history,
+            )
+
+        # Compute the implicit reward for each action.
+        implicit_reward = chosen_action_value - p.discount_factor * next_state_value
+
+        expert_implicit_reward = implicit_reward[expert_action]
+        other_implicit_reward = implicit_reward[~expert_action]
+
+        loss_expert = -expert_implicit_reward.mean()
+        loss_other = 0.5 * (other_implicit_reward ** 2).mean()
+       
 
         # calibrate policy temperature
-        policy_logits = self.model.action_values_to_policy_logits(action_values.detach())
-        loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
+        expert_action_values = action_values[expert_action]
+        policy_logits = self.model.action_values_to_policy_logits(expert_action_values.detach())
+        loss_policy = F.cross_entropy(policy_logits, action_category[expert_action])
         
-        expert_state_action_value = next_state_value[expert_action].mean()
-        other_state_action_value = next_state_value[~expert_action].mean()
+        self.log("num expert actions", action_values[expert_action].shape[0], prog_bar=False)
 
-
-        loss = loss_quality + loss_policy
+        loss =  loss_expert + loss_other #+ loss_policy
+        # self.log_image(frame[0], "frame/current")
+        # self.log_image(next_frame[0], "frame/next")
         self.log("train_loss", loss, prog_bar=True)
-        self.log("expert_state_action_value", expert_state_action_value, prog_bar=False)
-        self.log("other_state_action_value", other_state_action_value, prog_bar=False)
+        self.log("loss/expert_reward", loss_expert, prog_bar=False)
+        self.log("loss/other_reward", loss_other, prog_bar=False)
+        self.log("loss/policy", loss_policy, prog_bar=False)
+        self.log("implicit_reward/expert", expert_implicit_reward.mean(), prog_bar=False)
+        self.log("implicit_reward/other", other_implicit_reward.mean(), prog_bar=False)
         self.log("temperature", self.model.log_temperature.exp(), prog_bar=False)
-        self.log("loss_quality", loss_quality, prog_bar=False)
-        self.log("loss_policy", loss_policy, prog_bar=False)
         return loss
 
+    def log_image(self, image: torch.Tensor, name: str) -> None:
+        """Log a single image of [C,H,W]"""
+        x = image.detach().cpu().float()
+        x = torch.clamp(x, 0.0, 1.0)
+        self.logger.experiment.add_image(name, x, self.global_step)
 
 
+# import torch
+# import torch.nn.functional as F
+
+# def iq_learn_loss(Q_net, target_Q_net, expert_batch, policy_batch, gamma=0.99):
+#     """
+#     Q_net:        the Q-network being trained
+#     target_Q_net: target network for stable bootstrapping
+#     expert_batch: (s, a, s', done) from expert demonstrations
+#     policy_batch: (s, a, s', done) from replay buffer / online rollouts
+#     """
+#     s_e,  a_e,  s_next_e,  done_e  = expert_batch
+#     s_p,  a_p,  s_next_p,  done_p  = policy_batch
+
+#     def soft_value(s):
+#         """V(s) = logsumexp over actions = E_pi[Q - log pi]"""
+#         q = Q_net(s)                        # (B, A)
+#         return torch.logsumexp(q, dim=-1)   # (B,)  [tau=1 absorbed into Q scale]
+
+#     def implicit_reward(s, a, s_next, done):
+#         """r_hat = Q(s,a) - gamma * V(s')"""
+#         q_sa = Q_net(s).gather(1, a.unsqueeze(1)).squeeze(1)  # (B,)
+#         with torch.no_grad():
+#             v_next = soft_value(s_next)
+#         return q_sa - gamma * v_next * (1.0 - done.float())
+
+#     # Implicit reward on each dataset
+#     r_expert = implicit_reward(s_e, a_e, s_next_e, done_e)  # push up
+#     r_policy = implicit_reward(s_p, a_p, s_next_p, done_p)  # push down
+
+#     # IQ-Learn loss (chi^2 regulariser)
+#     loss_expert = -r_expert.mean()               # maximise expert implicit reward
+#     loss_policy =  0.5 * (r_policy ** 2).mean()  # chi^2 penalty on policy
+
+#     loss = loss_expert + loss_policy
+#     return loss
