@@ -5,6 +5,7 @@ history_digest:
 action_vector_length: 5
 
 data_dir: "recorded_data"
+experiment_name: "reward_with_cross_entropy"
 
 learning_rate: 0.001
 batch_size: 32

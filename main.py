@@ -33,7 +33,7 @@ def train(config_path: Path, checkpoint_path: Path):
 
     logger = TensorBoardLogger(
         save_dir="lightning_logs",
-        name="autonomous-driver",
+        name=config['experiment_name'],
     )
 
     checkpoint_callback = ModelCheckpoint(

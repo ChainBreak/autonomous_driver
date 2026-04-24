@@ -114,12 +114,15 @@ class LitModule(L.LightningModule):
         chosen_action_value = action_values.gather(
             1, action_category.long().unsqueeze(1)
         ).squeeze(1)
-        
+
         loss_quality = F.mse_loss(chosen_action_value, quality_value_target.detach())
 
         # calibrate policy temperature
-        policy_logits = self.model.action_values_to_policy_logits(action_values[expert_action].detach())
+        policy_logits = self.model.action_values_to_policy_logits(action_values[expert_action])
         loss_policy = F.cross_entropy(policy_logits, action_category[expert_action])
+        
+        export_policy_accuracy = (policy_logits.argmax(dim=1) == action_category[expert_action]).float().mean()
+        chosen_action_prob = policy_logits.softmax(dim=1).gather(1, action_category[expert_action].long().unsqueeze(1)).squeeze(1)
         
         expert_state_action_value = next_state_value[expert_action].mean()
         other_state_action_value = next_state_value[~expert_action].mean()
@@ -129,6 +132,8 @@ class LitModule(L.LightningModule):
         self.log("state_action_value/expert", expert_state_action_value, prog_bar=False)
         self.log("state_action_value/other", other_state_action_value, prog_bar=False)
         self.log("temperature", self.model.log_temperature.exp(), prog_bar=False)
+        self.log("export_policy_accuracy", export_policy_accuracy, prog_bar=False)
+        self.log("chosen_action_prob", chosen_action_prob.mean(), prog_bar=False)
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
         self.log("loss/policy", loss_policy, prog_bar=False)
