@@ -100,40 +100,55 @@ class LitModule(L.LightningModule):
         action_category = batch["action_category"]
 
         # Estimate the value of the next state
-        next_state_value = self.model_ema.module.estimate_state_value(
-            frame=next_frame,
-            action_history=next_action_history,
-        )
+        with torch.no_grad():
+            next_state_value = self.model_ema.module.estimate_state_value(
+                frame=next_frame,
+                action_history=next_action_history,
+            )
 
-        # Experate state actions get a reward of 1, all other actions get a reward of 0.
+        # Expert state actions get a reward of 1, all other actions get a reward of 0.
         reward = 1*expert_action
 
+        # Compute the target quality values
         quality_value_target = reward + p.discount_factor * next_state_value
 
+        # Get the quality of the chosen acation
         action_values = self.model.quality(frame, action_history)
         chosen_action_value = action_values.gather(
             1, action_category.long().unsqueeze(1)
         ).squeeze(1)
 
-        loss_quality = F.mse_loss(chosen_action_value, quality_value_target.detach())
+        # Compute the loss for the quality
+        loss_quality = F.mse_loss(chosen_action_value, quality_value_target)
 
-        # calibrate policy temperature
-        policy_logits = self.model.action_values_to_policy_logits(action_values[expert_action])
-        loss_policy = F.cross_entropy(policy_logits, action_category[expert_action])
-        
-        export_policy_accuracy = (policy_logits.argmax(dim=1) == action_category[expert_action]).float().mean()
-        chosen_action_prob = policy_logits.softmax(dim=1).gather(1, action_category[expert_action].long().unsqueeze(1)).squeeze(1)
+        # Expert action policy loss
+        policy_logits = self.model.action_values_to_policy_logits(action_values)
+        loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
+
+
+        # Compute the accuracy of the policy for the expert and other actions
+        policy_correct = policy_logits.argmax(dim=1) == action_category
+        expert_policy_accuracy = policy_correct[expert_action].float().mean()
+        other_policy_accuracy = policy_correct[~expert_action].float().mean()
+
+
+        max_action_prob = policy_logits.softmax(dim=1).max(dim=1).values
+        expert_max_action_prob = max_action_prob[expert_action].mean()
+        other_max_action_prob = max_action_prob[~expert_action].mean()
         
         expert_state_action_value = next_state_value[expert_action].mean()
         other_state_action_value = next_state_value[~expert_action].mean()
 
 
         loss = loss_quality + loss_policy
+      
         self.log("state_action_value/expert", expert_state_action_value, prog_bar=False)
         self.log("state_action_value/other", other_state_action_value, prog_bar=False)
+        self.log("policy_accuracy/expert", expert_policy_accuracy, prog_bar=False)
+        self.log("policy_accuracy/other", other_policy_accuracy, prog_bar=False)
+        self.log("max_action_prob/expert", expert_max_action_prob, prog_bar=False)
+        self.log("max_action_prob/other", other_max_action_prob, prog_bar=False)
         self.log("temperature", self.model.log_temperature.exp(), prog_bar=False)
-        self.log("export_policy_accuracy", export_policy_accuracy, prog_bar=False)
-        self.log("chosen_action_prob", chosen_action_prob.mean(), prog_bar=False)
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
         self.log("loss/policy", loss_policy, prog_bar=False)
