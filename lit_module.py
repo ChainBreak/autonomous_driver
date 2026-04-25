@@ -122,7 +122,7 @@ class LitModule(L.LightningModule):
         loss_quality = F.mse_loss(chosen_action_value, quality_value_target)
 
         # Expert action policy loss
-        policy_logits = self.model.action_values_to_policy_logits(action_values.detach())
+        policy_logits = self.model.action_values_to_policy_logits(action_values)
         loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
 
         cql_loss = self.cql_loss(action_values, action_category)
@@ -170,3 +170,23 @@ class LitModule(L.LightningModule):
 
         return p.conservative_alpha * conservative_penalty
 
+# # --- Compute TD(0) advantage ---
+#     with torch.no_grad():
+#         next_values = value_net(next_states).squeeze(-1)  # V(s')
+#         targets = rewards + gamma * next_values * (1 - dones)  # r + γV(s')
+
+#     values = value_net(states).squeeze(-1)                # V(s)
+#     advantages = (targets - values).detach()              # A = r + γV(s') - V(s)
+
+#     # --- Policy loss ---
+#     logits = policy(states)
+#     dist = torch.distributions.Categorical(logits=logits)
+#     log_probs = dist.log_prob(actions)
+
+#     policy_loss = -(log_probs * advantages).mean()
+
+#     # --- Value loss: train V(s) toward TD target ---
+#     value_loss = nn.functional.mse_loss(values, targets)
+
+#     # --- Update ---
+#     loss = policy_loss + value_loss

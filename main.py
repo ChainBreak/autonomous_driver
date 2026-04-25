@@ -37,7 +37,7 @@ def train(config_path: Path, checkpoint_path: Path):
     )
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='train_loss',  # metric to monitor
+        monitor='loss/train',  # metric to monitor
         dirpath=logger.log_dir + '/checkpoints',
         filename='autonomous-driver-{step:06d}-{train_loss:.2f}',
         save_top_k=5,  # save top 5 checkpoints
