@@ -56,12 +56,7 @@ class Model(nn.Module):
         
         action_values = self.quality(frame, action_history)
 
-        # The policy is derived from the quality values. 
-        # Simply scale by the temperature and then normalize to get the policy.
-        action_probs = torch.softmax(self.action_values_to_policy_logits(action_values), dim=1)
-        
-        # Get the policy weighted value of the actions.
-        value = (action_probs * action_values).sum(dim=1)
+        value = torch.logsumexp(action_values, dim=1)
         return value
 
     def action_values_to_policy_logits(self, action_values: torch.Tensor) -> torch.Tensor:

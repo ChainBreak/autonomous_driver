@@ -97,7 +97,7 @@ class LitModule(L.LightningModule):
         next_frame = batch["next_frame"]
         next_action_history = batch["next_action_history"]
         expert_action = batch["expert_action"]
-        action_category = batch["action_category"]
+        action_category = batch["action_category"].long()
 
         # Estimate the value of the next state
         with torch.no_grad():
@@ -115,16 +115,19 @@ class LitModule(L.LightningModule):
         # Get the quality of the chosen acation
         action_values = self.model.quality(frame, action_history)
         chosen_action_value = action_values.gather(
-            1, action_category.long().unsqueeze(1)
+            1, action_category.unsqueeze(1)
         ).squeeze(1)
 
         # Compute the loss for the quality
         loss_quality = F.mse_loss(chosen_action_value, quality_value_target)
 
         # Expert action policy loss
-        policy_logits = self.model.action_values_to_policy_logits(action_values)
+        policy_logits = self.model.action_values_to_policy_logits(action_values.detach())
         loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
 
+        cql_loss = self.cql_loss(action_values, action_category)
+
+        loss = loss_quality  + loss_policy + cql_loss
 
         # Compute the accuracy of the policy for the expert and other actions
         policy_correct = policy_logits.argmax(dim=1) == action_category
@@ -140,7 +143,6 @@ class LitModule(L.LightningModule):
         other_state_action_value = next_state_value[~expert_action].mean()
 
 
-        loss = loss_quality + loss_policy
       
         self.log("state_action_value/expert", expert_state_action_value, prog_bar=False)
         self.log("state_action_value/other", other_state_action_value, prog_bar=False)
@@ -152,7 +154,19 @@ class LitModule(L.LightningModule):
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
         self.log("loss/policy", loss_policy, prog_bar=False)
+        self.log("loss/cql", cql_loss, prog_bar=False)
         return loss
 
+    def cql_loss(self, quality_values: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+        p = self.hparams
 
+        # Logsumexp over all actions — pushes Q DOWN on OOD actions
+        log_sum_exp = torch.logsumexp(quality_values, dim=1)  # (batch,)
+
+        # Q-value of the action actually taken — pushes Q UP on in-dataset actions
+        q_taken = quality_values.gather(1, actions.unsqueeze(1)).squeeze(1)  # (batch,)
+
+        conservative_penalty = (log_sum_exp - q_taken).mean()
+
+        return p.conservative_alpha * conservative_penalty
 
