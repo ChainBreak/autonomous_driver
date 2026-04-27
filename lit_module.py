@@ -90,6 +90,7 @@ class LitModule(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         p = self.hparams
+
         self.model_ema.update_parameters(self.model)
 
         frame = batch["frame"]
@@ -101,38 +102,53 @@ class LitModule(L.LightningModule):
 
         # Estimate the value of the next state
         with torch.no_grad():
-            next_state_value = self.model_ema.module.estimate_state_value(
-                frame=next_frame,
+            next_action_values = self.model_ema.module.quality(
+                image=next_frame,
                 action_history=next_action_history,
             )
+            next_state_value = self.model_ema.module.estimate_state_value(next_action_values)
 
         # Expert state actions get a reward of 1, all other actions get a reward of 0.
-        reward = 1*expert_action
+        reward = expert_action.float()
+
 
         # Compute the target quality values
         quality_value_target = reward + p.discount_factor * next_state_value
 
         # Get the quality of the chosen acation
         action_values = self.model.quality(frame, action_history)
+        # state_value = self.model.estimate_state_value(action_values)
         chosen_action_value = action_values.gather(
             1, action_category.unsqueeze(1)
         ).squeeze(1)
 
+
+        advantage = (quality_value_target - chosen_action_value).detach()
+
+        # print("reward, quality_value_target, chosen_action_value, advantage")
+        # for i in range(len(reward)):
+        #     print(reward[i].item(), quality_value_target[i].item(), chosen_action_value[i].item(), advantage[i].item())
+
+        policy_logits = self.model.action_values_to_policy_logits(action_values)
+        distribution = torch.distributions.Categorical(logits=policy_logits)
+        log_probs = distribution.log_prob(action_category)
+        loss_policy = -(log_probs * advantage).mean()
+    
+
         # Compute the loss for the quality
         loss_quality = F.mse_loss(chosen_action_value, quality_value_target)
 
-        # Expert action policy loss
-        policy_logits = self.model.action_values_to_policy_logits(action_values)
-        loss_policy = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
-
-        cql_loss = self.cql_loss(action_values, action_category)
-
-        loss = loss_quality  + loss_policy + cql_loss
+        loss = loss_quality  + loss_policy
 
         # Compute the accuracy of the policy for the expert and other actions
         policy_correct = policy_logits.argmax(dim=1) == action_category
         expert_policy_accuracy = policy_correct[expert_action].float().mean()
         other_policy_accuracy = policy_correct[~expert_action].float().mean()
+
+        export_advantage = advantage[expert_action].mean()
+        other_advantage = advantage[~expert_action].mean()
+        self.log("advantage/expert", export_advantage, prog_bar=False)
+        self.log("advantage/other", other_advantage, prog_bar=False)
 
 
         max_action_prob = policy_logits.softmax(dim=1).max(dim=1).values
@@ -154,21 +170,15 @@ class LitModule(L.LightningModule):
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
         self.log("loss/policy", loss_policy, prog_bar=False)
-        self.log("loss/cql", cql_loss, prog_bar=False)
+
+        self.log('log_probs/mean', log_probs.mean(), prog_bar=False)
+        self.log('log_probs/min', log_probs.min(), prog_bar=False)
+        self.log('log_probs/max', log_probs.max(), prog_bar=False)
+        self.log('advantage/mean', advantage.mean(), prog_bar=False)
+        self.log('advantage/min', advantage.min(), prog_bar=False)
+        self.log('advantage/max', advantage.max(), prog_bar=False)
         return loss
 
-    def cql_loss(self, quality_values: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
-        p = self.hparams
-
-        # Logsumexp over all actions — pushes Q DOWN on OOD actions
-        log_sum_exp = torch.logsumexp(quality_values, dim=1)  # (batch,)
-
-        # Q-value of the action actually taken — pushes Q UP on in-dataset actions
-        q_taken = quality_values.gather(1, actions.unsqueeze(1)).squeeze(1)  # (batch,)
-
-        conservative_penalty = (log_sum_exp - q_taken).mean()
-
-        return p.conservative_alpha * conservative_penalty
 
 # # --- Compute TD(0) advantage ---
 #     with torch.no_grad():

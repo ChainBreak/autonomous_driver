@@ -52,12 +52,13 @@ class Model(nn.Module):
         x = self.action_quality_decoder(x)
         return x
 
-    def estimate_state_value(self, frame: torch.Tensor, action_history: torch.Tensor) -> torch.Tensor:
-        
-        action_values = self.quality(frame, action_history)
-
-        value = torch.logsumexp(action_values, dim=1)
-        return value
+    def estimate_state_value(self, action_values: torch.Tensor) -> torch.Tensor:
+        """
+        Estimate the value of the state given the action values.
+        """
+        policy_logits = self.action_values_to_policy_logits(action_values)
+        action_probs = torch.softmax(policy_logits, dim=1)
+        return torch.sum(action_values * action_probs, dim=1)
 
     def action_values_to_policy_logits(self, action_values: torch.Tensor) -> torch.Tensor:
         return action_values / self.log_temperature.exp()
