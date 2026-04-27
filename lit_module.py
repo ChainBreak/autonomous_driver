@@ -102,43 +102,42 @@ class LitModule(L.LightningModule):
 
         # Estimate the value of the next state
         with torch.no_grad():
-            next_action_values = self.model_ema.module.quality(
+            next_policy_logits, next_action_values, next_state_value = self.model_ema.module.policy_and_quality_and_state_value(
                 image=next_frame,
                 action_history=next_action_history,
             )
-            next_state_value = self.model_ema.module.estimate_state_value(next_action_values)
+        
+        policy_logits, action_values, state_value = self.model.policy_and_quality_and_state_value(
+            image=frame,
+            action_history=action_history,
+        )
 
-        # Expert state actions get a reward of 1, all other actions get a reward of 0.
         reward = expert_action.float()
 
+        next_state_value_target = reward + p.discount_factor * next_state_value
 
-        # Compute the target quality values
-        quality_value_target = reward + p.discount_factor * next_state_value
+        advantage = (next_state_value_target - state_value).detach().clamp(min=0)
+        
+        distribution = torch.distributions.Categorical(logits=policy_logits)
+        log_probs = distribution.log_prob(action_category)
+        loss_policy = -(log_probs * advantage).mean()
+
+        # print("policy_logits")
+        # print(policy_logits[0].detach().cpu().numpy())
+        # print("policy_logits.softmax(dim=1)")
+        # print(policy_logits.softmax(dim=1)[0].detach().cpu().numpy())
+        # print("log_probs")
+        # print(log_probs[0].detach().cpu().numpy())
 
         # Get the quality of the chosen acation
-        action_values = self.model.quality(frame, action_history)
-        # state_value = self.model.estimate_state_value(action_values)
         chosen_action_value = action_values.gather(
             1, action_category.unsqueeze(1)
         ).squeeze(1)
 
-
-        advantage = (quality_value_target - chosen_action_value).detach()
-
-        # print("reward, quality_value_target, chosen_action_value, advantage")
-        # for i in range(len(reward)):
-        #     print(reward[i].item(), quality_value_target[i].item(), chosen_action_value[i].item(), advantage[i].item())
-
-        policy_logits = self.model.action_values_to_policy_logits(action_values)
-        distribution = torch.distributions.Categorical(logits=policy_logits)
-        log_probs = distribution.log_prob(action_category)
-        loss_policy = -(log_probs * advantage).mean()
-    
-
         # Compute the loss for the quality
-        loss_quality = F.mse_loss(chosen_action_value, quality_value_target)
+        loss_quality = F.mse_loss(chosen_action_value, next_state_value_target)
 
-        loss = loss_quality  + loss_policy
+        loss = loss_quality  + loss_policy 
 
         # Compute the accuracy of the policy for the expert and other actions
         policy_correct = policy_logits.argmax(dim=1) == action_category
@@ -166,11 +165,9 @@ class LitModule(L.LightningModule):
         self.log("policy_accuracy/other", other_policy_accuracy, prog_bar=False)
         self.log("max_action_prob/expert", expert_max_action_prob, prog_bar=False)
         self.log("max_action_prob/other", other_max_action_prob, prog_bar=False)
-        self.log("temperature", self.model.log_temperature.exp(), prog_bar=False)
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
         self.log("loss/policy", loss_policy, prog_bar=False)
-
         self.log('log_probs/mean', log_probs.mean(), prog_bar=False)
         self.log('log_probs/min', log_probs.min(), prog_bar=False)
         self.log('log_probs/max', log_probs.max(), prog_bar=False)

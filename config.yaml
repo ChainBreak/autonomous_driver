@@ -7,7 +7,7 @@ action_vector_length: 5
 data_dir: "recorded_data"
 experiment_name: "q_policy_gradients"
 
-learning_rate: 0.001
+learning_rate: 0.01
 batch_size: 32
 image_size: 64
 
