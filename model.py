@@ -66,5 +66,6 @@ class Model(nn.Module):
         """
         Estimate the value of the state given the action values.
         """
-        action_probs = torch.softmax(policy_logits, dim=1)
-        return torch.sum(action_values * action_probs, dim=1)
+        return action_values.max(dim=1).values
+        # action_probs = torch.softmax(policy_logits, dim=1)
+        # return torch.sum(action_values * action_probs, dim=1)

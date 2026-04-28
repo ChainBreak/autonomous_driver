@@ -112,22 +112,9 @@ class LitModule(L.LightningModule):
             action_history=action_history,
         )
 
-        reward = expert_action.float()
-
-        next_state_value_target = reward + p.discount_factor * next_state_value
-
-        advantage = (next_state_value_target - state_value).detach().clamp(min=0)
-        
-        distribution = torch.distributions.Categorical(logits=policy_logits)
-        log_probs = distribution.log_prob(action_category)
-        loss_policy = -(log_probs * advantage).mean()
-
-        # print("policy_logits")
-        # print(policy_logits[0].detach().cpu().numpy())
-        # print("policy_logits.softmax(dim=1)")
-        # print(policy_logits.softmax(dim=1)[0].detach().cpu().numpy())
-        # print("log_probs")
-        # print(log_probs[0].detach().cpu().numpy())
+        next_state_value[expert_action] = 1.0
+        next_state_value = next_state_value.clamp(min=0, max=1)
+        next_state_value_target =  p.discount_factor * next_state_value
 
         # Get the quality of the chosen acation
         chosen_action_value = action_values.gather(
@@ -137,18 +124,17 @@ class LitModule(L.LightningModule):
         # Compute the loss for the quality
         loss_quality = F.mse_loss(chosen_action_value, next_state_value_target)
 
-        loss = loss_quality  + loss_policy 
+        expert_policy_loss = F.cross_entropy(policy_logits[expert_action], action_category[expert_action])
+        other_policy_loss =  F.cross_entropy(policy_logits[~expert_action], action_values[~expert_action].argmax(dim=1))
+
+        value_regularization = 0.01 * (action_values**2).mean()
+
+        loss = loss_quality + 0.001*(expert_policy_loss + other_policy_loss) + value_regularization
 
         # Compute the accuracy of the policy for the expert and other actions
         policy_correct = policy_logits.argmax(dim=1) == action_category
         expert_policy_accuracy = policy_correct[expert_action].float().mean()
         other_policy_accuracy = policy_correct[~expert_action].float().mean()
-
-        export_advantage = advantage[expert_action].mean()
-        other_advantage = advantage[~expert_action].mean()
-        self.log("advantage/expert", export_advantage, prog_bar=False)
-        self.log("advantage/other", other_advantage, prog_bar=False)
-
 
         max_action_prob = policy_logits.softmax(dim=1).max(dim=1).values
         expert_max_action_prob = max_action_prob[expert_action].mean()
@@ -167,13 +153,9 @@ class LitModule(L.LightningModule):
         self.log("max_action_prob/other", other_max_action_prob, prog_bar=False)
         self.log("loss/train", loss, prog_bar=True)
         self.log("loss/quality", loss_quality, prog_bar=False)
-        self.log("loss/policy", loss_policy, prog_bar=False)
-        self.log('log_probs/mean', log_probs.mean(), prog_bar=False)
-        self.log('log_probs/min', log_probs.min(), prog_bar=False)
-        self.log('log_probs/max', log_probs.max(), prog_bar=False)
-        self.log('advantage/mean', advantage.mean(), prog_bar=False)
-        self.log('advantage/min', advantage.min(), prog_bar=False)
-        self.log('advantage/max', advantage.max(), prog_bar=False)
+        self.log("loss/expert_policy", expert_policy_loss, prog_bar=False)
+        self.log("loss/other_policy", other_policy_loss, prog_bar=False)
+        self.log("loss/value_regularization", value_regularization, prog_bar=False)
         return loss
 
 
