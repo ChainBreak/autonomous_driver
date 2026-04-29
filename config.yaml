@@ -7,8 +7,9 @@ action_vector_length: 5
 data_dir: "recorded_data"
 experiment_name: "argmax_policy_gradients"
 
-learning_rate: 0.01
+learning_rate: 0.001
 batch_size: 32
+num_workers: 3
 image_size: 64
 
 ema_decay: 0.999

@@ -1,5 +1,4 @@
 import click
-from game import Game
 from pathlib import Path
 from lit_module import LitModule
 import lightning as L
@@ -16,6 +15,7 @@ def cli():
 @click.option('--checkpoint-path', type=Path, help='Path to the checkpoint file')
 def run(checkpoint_path: Path):
     """Run the autonomous driver with a trained model"""
+    from game import Game
     game = Game(checkpoint_path)
     game.setup()
     game.run()

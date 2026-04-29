@@ -82,6 +82,8 @@ class LitModule(L.LightningModule):
         return DataLoader(
             dataset=dataset,
             batch_size=p.batch_size,
+            num_workers=p.num_workers,
+            persistent_workers=p.num_workers > 0,
         )
 
     def configure_optimizers(self):
@@ -113,6 +115,7 @@ class LitModule(L.LightningModule):
         )
 
         next_state_value[expert_action] = 1.0
+        
         next_state_value = next_state_value.clamp(min=0, max=1)
         next_state_value_target =  p.discount_factor * next_state_value
 
