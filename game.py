@@ -133,8 +133,8 @@ class Game:
             view_surface = pygame.surfarray.make_surface(view)
             
             # Calculate position in grid (2x2 layout)
-            row = i // 2
-            col = i % 2
+            row = i // 5
+            col = i % 5
             x = col * (view_width + padding)
             y = row * (view_height + padding)
             

@@ -9,7 +9,7 @@ training_width = 64
 training_height = 64
 view_display_width = 100
 view_display_height = 100
-num_cars = 10
+num_cars = 15
 
 car_width = 6
 car_height = 10 
