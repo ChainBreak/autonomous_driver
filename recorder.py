@@ -1,6 +1,7 @@
 from environment import Observation, Action
 from pathlib import Path
 from datetime import datetime
+import json
 import cv2
 import numpy as np
 from collections import deque
@@ -36,17 +37,19 @@ class Recorder:
         action: Action,
         *,
         record: bool,
+        recording_mode: str = "expert",
     ) -> None:
         image_path = self.recording_dir / f"{self.frame_count:06d}_frame.png"
         action_path = self.recording_dir / f"{self.frame_count:06d}_action.npy"
+        metadata_path = self.recording_dir / f"{self.frame_count:06d}_metadata.json"
 
         view = cv2.cvtColor(observation.view, cv2.COLOR_RGB2BGR)
         cv2.imwrite(str(image_path), view)
         np.save(action_path, action)
 
         if record:
-            marker_path = self.recording_dir / f"{self.frame_count:06d}_training_marker.txt"
-            marker_path.touch()
+            with metadata_path.open("w", encoding="utf-8") as f:
+                json.dump({"recording_mode": recording_mode}, f)
             self._frames_to_delete.clear()
         else:
             self._frames_to_delete.append([image_path, action_path])

@@ -33,11 +33,11 @@ def train(config_path: Path, checkpoint_path: Path):
 
     logger = TensorBoardLogger(
         save_dir="lightning_logs",
-        name="autonomous-driver",
+        name=config['experiment_name'],
     )
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='train_loss',  # metric to monitor
+        monitor='loss/train',  # metric to monitor
         dirpath=logger.log_dir + '/checkpoints',
         filename='autonomous-driver-{step:06d}-{train_loss:.2f}',
         save_top_k=5,  # save top 5 checkpoints
@@ -46,7 +46,8 @@ def train(config_path: Path, checkpoint_path: Path):
     )
 
     trainer = L.Trainer(
-        max_epochs=-1,
+        max_epochs=None,
+        limit_train_batches=config['limit_train_batches'],
         logger=logger,
         callbacks=[checkpoint_callback],
     )
