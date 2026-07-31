@@ -7,4 +7,5 @@ action_vector_length: 5
 data_dir: "recorded_data"
 
 batch_size: 128
+num_workers: 4
 image_size: 64

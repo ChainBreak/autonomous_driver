@@ -72,9 +72,11 @@ class LitModule(L.LightningModule):
         )
 
         return DataLoader(
-            dataset=dataset, 
+            dataset=dataset,
             batch_size=p.batch_size,
             shuffle=True,
+            num_workers=p.num_workers,
+            persistent_workers=p.num_workers > 1,
         )
 
     def configure_optimizers(self):
