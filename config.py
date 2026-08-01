@@ -20,7 +20,7 @@ car_max_steering_ratio = 5 #deg/distance
 car_steering_ratio_speed = 15 #deg/distance/second
 map_path = project_root / "map-with-roads-in-city-children-road-for-toy-vector-37977821.jpg"
 
-recording_dir = project_root / "recorded_data"
+recording_dir = project_root / "data/good_bad"
 
 # Number of frames to keep when recording with autopilot on (matches HistoryDigest total_length for num_windows=12, growth_rate=1.5)
 recording_digest_window = 253

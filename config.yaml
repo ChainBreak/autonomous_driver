@@ -4,12 +4,13 @@ history_digest:
 
 action_vector_length: 5
 
-data_dir: "recorded_data"
+data_dir: "data/good_bad"
 experiment_name: "good_bad"
 
 learning_rate: 0.001
 batch_size: 32
 image_size: 64
+num_workers: 4
 
 limit_train_batches: 1000
 
