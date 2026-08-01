@@ -28,22 +28,22 @@ class RecordedDataset(IterableDataset):
 
         recording_dirs = self.find_all_recording_dirs(self.data_dir)
         self.training_items = self.make_list_of_all_training_items(recording_dirs)
-        for recording_type, state_transitions in self.training_items.items():
-            print(f"Found {len(state_transitions)} state transitions for {recording_type}")
+        for recording_type, state_actions in self.training_items.items():
+            print(f"Found {len(state_actions)} state actions for {recording_type}")
         
     def find_all_recording_dirs(self, data_dir:Path):
         recordings = list(data_dir.glob("recording_*"))
         print(f"Found {len(recordings)} recordings: {data_dir}")
         return recordings
 
-    def make_list_of_all_training_items(self, recording_dirs:list[Path]) -> defaultdict[str, list["StateTransition"]]:
-        state_transitions_per_recording_type: defaultdict[str, list["StateTransition"]] = defaultdict(list)
+    def make_list_of_all_training_items(self, recording_dirs:list[Path]) -> defaultdict[str, list["StateAction"]]:
+        state_actions_per_recording_type: defaultdict[str, list["StateAction"]] = defaultdict(list)
 
         for recording_dir in recording_dirs:
-            state_action = self.compute_full_states_for_single_recording(recording_dir)
-            self.group_state_transitions_for_recording_types(state_action, state_transitions_per_recording_type)
+            state_actions = self.compute_full_states_for_single_recording(recording_dir)
+            self.group_state_actions_for_recording_types(state_actions, state_actions_per_recording_type)
             
-        return state_transitions_per_recording_type
+        return state_actions_per_recording_type
 
     def compute_full_states_for_single_recording(self, recording_dir: Path) -> list["StateAction"]:
         """Run history digest over ALL frames in order; only frames with _metadata.json are added to the training list."""
@@ -74,14 +74,11 @@ class RecordedDataset(IterableDataset):
         return all_items
 
 
-    def group_state_transitions_for_recording_types(self, 
-        state_action_paths: list["StateAction"],
-        state_transitions_per_recording_type:defaultdict[str, list["StateTransition"]],
+    def group_state_actions_for_recording_types(self, 
+        state_actions: list["StateAction"],
+        state_actions_per_recording_type:defaultdict[str, list["StateAction"]],
         ):
-        state_actions = state_action_paths[:-1]
-        next_state_actions = state_action_paths[1:]
-        
-        for state_action, next_state_action in zip(state_actions, next_state_actions):
+        for state_action in state_actions:
 
             # If metadata exists then this state action is good for training
             if state_action.metadata_path.exists():
@@ -90,10 +87,8 @@ class RecordedDataset(IterableDataset):
                 with state_action.metadata_path.open(encoding="utf-8") as f:
                     metadata = json.load(f)
                 recording_type = metadata["recording_mode"]
-                
-                # Create state transition pair of state and next_state
-                state_transition = StateTransition(state_action, next_state_action)
-                state_transitions_per_recording_type[recording_type].append(state_transition)
+
+                state_actions_per_recording_type[recording_type].append(state_action)
 
 
     def cache_complete_marker_path(self, recording_dir: Path) -> Path:
@@ -122,11 +117,8 @@ class RecordedDataset(IterableDataset):
     
     def yield_sample_dicts(self) -> dict:
         recording_mode = random.choice(list(self.training_items.keys()))
-        state_transitions = self.training_items[recording_mode]
-        state_transition = random.choice(state_transitions)
-
-        state_action = state_transition.state_action
-        next_state_action = state_transition.next_state_action
+        state_actions = self.training_items[recording_mode]
+        state_action = random.choice(state_actions)
 
         frame = Image.open(state_action.frame_path)
         frame = self.transform(frame)
@@ -134,33 +126,21 @@ class RecordedDataset(IterableDataset):
 
         action = np.load(state_action.action_path)
 
-        next_frame = Image.open(next_state_action.frame_path)
-        next_frame = self.transform(next_frame)
-        next_action_history = np.load(next_state_action.history_path)
-
         expert_action = recording_mode == "expert"
 
         action_category = self.action_categorizer.to_category(action)
 
         return {
             "frame": frame,
-            "next_frame": next_frame,
             "action": action.astype(np.float32),
             "action_category": action_category.astype(np.int32),
             "action_history": action_history.astype(np.float32),
-            "next_action_history": next_action_history.astype(np.float32),
             "expert_action": torch.tensor(expert_action, dtype=torch.bool),
         }
       
     def __iter__(self):
         while True:
             yield self.yield_sample_dicts()
-
-@dataclass(frozen=True, slots=True)
-class StateTransition:
-    state_action:"StateAction"
-    next_state_action:"StateAction"
-    
 
 @dataclass(frozen=True, slots=True)
 class StateAction:
