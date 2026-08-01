@@ -103,13 +103,11 @@ class Game:
                 self.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    if self.autopilot_on:
-                        self.recording_enabled = False
-                    else:
-                        self.recording_enabled = not self.recording_enabled
+                    # Arming is independent of autopilot: you can arm while the
+                    # autopilot drives, and recording only becomes active once
+                    # the human intervenes (see loop()).
+                    self.recording_enabled = not self.recording_enabled
                 if event.key == pygame.K_a:
-                    if not self.autopilot_on:
-                        self.recording_enabled = False
                     self.autopilot_on = not self.autopilot_on
                 if event.key == pygame.K_e:
                     self.recording_mode = "expert"
@@ -162,10 +160,16 @@ class Game:
         # Draw Recording / Autopilot state labels (grey when off, green when on)
         font = pygame.font.SysFont(None, 24)
         padding = 10
-        rec_color = (0, 255, 0) if self.recording_enabled else (128, 128, 128)
+        # Disabled -> grey, Armed (waiting for intervention) -> yellow, Enabled (recording) -> green
+        if self.recording_on:
+            rec_status, rec_color = "Enabled", (0, 255, 0)
+        elif self.recording_enabled:
+            rec_status, rec_color = "Armed", (255, 255, 0)
+        else:
+            rec_status, rec_color = "Disabled", (128, 128, 128)
         auto_color = (0, 255, 0) if self.autopilot_on else (128, 128, 128)
         rec_text = font.render(
-            f"Recording: {'Enabled' if self.recording_enabled else 'Disabled'}",
+            f"Recording: {rec_status}",
             True,
             rec_color,
         )
