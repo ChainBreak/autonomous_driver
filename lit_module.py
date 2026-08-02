@@ -68,6 +68,7 @@ class LitModule(L.LightningModule):
             data_dir=Path(p.data_dir),
             history_digest=history_digest,
             action_categorizer=action_categorizer,
+            use_training_mode=p.use_training_mode,
             transform=transform,
         )
 

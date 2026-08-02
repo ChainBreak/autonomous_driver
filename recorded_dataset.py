@@ -16,11 +16,13 @@ class RecordedDataset(IterableDataset):
         data_dir:Path,
         history_digest:HistoryDigest,
         action_categorizer:ActionCategorizer,
+        use_training_mode:str = "all",
         transform:Callable = lambda x: x,
     ):
         self.data_dir = data_dir
         self.history_digest = history_digest
         self.action_categorizer = action_categorizer
+        self.use_training_mode = use_training_mode
         self.transform = transform
 
         self.cache_dir = data_dir / "cache"
@@ -116,7 +118,11 @@ class RecordedDataset(IterableDataset):
         return cache_path
     
     def yield_sample_dicts(self) -> dict:
-        recording_mode = random.choice(list(self.training_items.keys()))
+        if self.use_training_mode == "all":
+            recording_mode = random.choice(list(self.training_items.keys()))
+        else:
+            recording_mode = self.use_training_mode
+
         state_actions = self.training_items[recording_mode]
         state_action = random.choice(state_actions)
 

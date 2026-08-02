@@ -7,6 +7,9 @@ action_vector_length: 5
 data_dir: "data/good_bad"
 experiment_name: "good_bad"
 
+# "all" samples evenly from all recording modes, "expert" only uses expert items
+use_training_mode: "expert"
+
 learning_rate: 0.001
 batch_size: 32
 image_size: 64

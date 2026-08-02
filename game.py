@@ -108,7 +108,7 @@ class Game:
                     # the human intervenes (see loop()).
                     self.recording_enabled = not self.recording_enabled
                 if event.key == pygame.K_a:
-                    self.autopilot_on = not self.autopilot_on
+                    self.autopilot_on = True
                 if event.key == pygame.K_e:
                     self.recording_mode = "expert"
                 if event.key == pygame.K_c:
